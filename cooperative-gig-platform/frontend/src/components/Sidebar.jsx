@@ -21,6 +21,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/customer', icon: HiOutlineHome, label: 'Dashboard', end: true },
       { to: '/customer/services', icon: HiOutlineBriefcase, label: 'Services' },
       { to: '/customer/bookings', icon: HiOutlineClipboardList, label: 'My Bookings' },
+      { to: '/customer/complaints', icon: HiOutlineExclamationTriangle, label: 'My Complaints' },
     ],
     worker: [
       { to: '/worker', icon: HiOutlineHome, label: 'Dashboard', end: true },
@@ -29,6 +30,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/worker/profile', icon: HiOutlineUser, label: 'My Profile' },
       { to: '/worker/earnings', icon: HiOutlineCurrencyRupee, label: 'Earnings' },
       { to: '/worker/collaborations', icon: HiOutlineUsers, label: 'Collaborations' },
+      { to: '/worker/complaints', icon: HiOutlineExclamationTriangle, label: 'Complaints' },
       { to: '/worker/welfare', icon: HiOutlineHeart, label: 'Welfare & Training' },
     ],
     admin: [

@@ -11,8 +11,11 @@
  */
 
 const Payment = require('../../models/Payment');
+const Refund = require('../../models/Refund');
+const Invoice = require('../../models/Invoice');
 const { generateRef } = require('../../utils/authHelper');
 const { asyncHandler } = require('../../middleware/errorMiddleware');
+const { createNotification } = require('../notification/notificationService');
 
 // ============ Gateway-agnostic interface ============
 
@@ -100,6 +103,91 @@ const processRefund = async (paymentId) => {
 };
 
 /**
+ * Initiate a (simulated) refund against a payment.
+ *
+ * Hackathon MVP: refund is simulated locally but every state and record
+ * mirrors a real gateway flow (Refund doc + gateway/transactionId), so a
+ * live gateway (e.g. Razorpay) can be swapped in later behind this method.
+ *
+ * @param {String} paymentId
+ * @param {Object} opts { amount, complaintId, initiatedBy, method }
+ */
+const initiateRefund = async (paymentId, opts = {}) => {
+  const payment = await Payment.findById(paymentId);
+  if (!payment) throw new Error('Payment not found');
+
+  const refundAmount = Math.min(opts.amount ?? payment.amount, payment.amount);
+  if (refundAmount <= 0) throw new Error('Refund amount must be greater than 0');
+  if (payment.status !== 'SUCCESS') {
+    throw new Error(`Cannot refund payment in ${payment.status} state`);
+  }
+
+  const existing = await Refund.findOne({ payment: payment._id, status: { $in: ['PROCESSING', 'PENDING'] } });
+  if (existing) return existing;
+
+  const refund = await Refund.create({
+    complaint: opts.complaintId,
+    booking: payment.booking,
+    payment: payment._id,
+    customer: payment.customer,
+    amount: refundAmount,
+    status: 'PROCESSING',
+    method: opts.method || 'MOCK_REFUND',
+    initiatedBy: opts.initiatedBy,
+    initiatedAt: new Date(),
+  });
+
+  // mark the payment + invoice so no double charge can occur
+  payment.status = 'REFUNDED';
+  payment.notes = `Refund ${refundAmount} initiated (${refund.refundNumber})`;
+  payment.refundedAt = new Date();
+  await payment.save();
+  await Invoice.updateOne({ booking: payment.booking }, { $set: { paymentStatus: 'REFUNDED' } });
+
+  // Simulated gateway callback — complete the refund shortly after,
+  // the same way a payment-webhook would confirm a real transfer.
+  setTimeout(() => {
+    completeRefund(refund._id).catch(() => {});
+  }, 3000);
+
+  return refund;
+};
+
+/**
+ * Complete a simulated refund (called by the mock gateway callback).
+ */
+const completeRefund = async (refundId) => {
+  const refund = await Refund.findById(refundId).populate('payment').populate('customer', 'name email');
+  if (!refund || refund.status === 'COMPLETED') return refund;
+  refund.status = 'COMPLETED';
+  refund.completedAt = new Date();
+  refund.gateway = 'mock';
+  await refund.save();
+
+  // Push a live notification to the customer
+  await createNotification({
+    user: refund.customer?._id,
+    type: 'REFUND_STATUS',
+    title: 'Refund completed',
+    message: `Refund of ₹${refund.amount} for ${refund.refundNumber} has been credited to your original payment method.`,
+    data: { refundId: refund._id, refundNumber: refund.refundNumber, complaintId: refund.complaint?.toString() },
+  });
+  return refund;
+};
+
+/**
+ * Abort a simulated refund (sets FAILED so admin can retry/investigate).
+ */
+const failRefund = async (refundId, reason) => {
+  const refund = await Refund.findById(refundId);
+  if (!refund) throw new Error('Refund not found');
+  refund.status = 'FAILED';
+  refund.failureReason = reason || 'Gateway error (simulated)';
+  await refund.save();
+  return refund;
+};
+
+/**
  * Verify a payment by transaction ID
  */
 const verifyPayment = async (transactionId) => {
@@ -120,6 +208,9 @@ module.exports = {
   createPayment,
   processPayment,
   processRefund,
+  initiateRefund,
+  completeRefund,
+  failRefund,
   verifyPayment,
   getPaymentStatus,
 };

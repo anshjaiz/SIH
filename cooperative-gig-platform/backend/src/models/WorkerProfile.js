@@ -76,6 +76,28 @@ const workerProfileSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Administrative suspension (safety/high-severity complaints)
+    suspensionNote: {
+      type: String,
+      default: '',
+    },
+    suspendedFrom: Date,
+    suspendedUntil: Date,
+    // Disciplinary history
+    warnings: [
+      {
+        title: String,
+        reason: String,
+        complaint: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Complaint',
+        },
+        at: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     certificates: [
       {
         type: mongoose.Schema.Types.ObjectId,

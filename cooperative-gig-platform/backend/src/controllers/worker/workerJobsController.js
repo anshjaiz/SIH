@@ -335,6 +335,9 @@ const completeJob = asyncHandler(async (req, res) => {
   const { completeTeam } = require('../../services/collaborator/teamFormationService');
   await completeTeam(booking._id);
 
+  // New historical data → AI models refresh shortly after
+  require('../../services/ai/aiPipelineService').scheduleRetrain();
+
   // Notify customer
   await Notification.create({
     user: booking.customer,

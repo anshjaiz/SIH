@@ -34,6 +34,11 @@ const forecastSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    level: {
+      type: String,
+      enum: ['HIGH', 'MEDIUM', 'LOW'],
+      default: 'LOW',
+    },
     confidence: {
       type: Number, // 0-100
       default: 0,

@@ -18,6 +18,16 @@ const {
   updateCooperativeSettings,
 } = require('../controllers/admin/adminController');
 const {
+  getComplaints: acGetComplaints,
+  getComplaintDetail,
+  respond: acRespond,
+  updateComplaint: acUpdateComplaint,
+  proposeResolution,
+  finalizeResolution,
+  escalate,
+  suspendWorker,
+} = require('../controllers/admin/adminComplaintController');
+const {
   getForecasts,
   getWorkforceAllocation,
   getDemandData,
@@ -57,9 +67,15 @@ router.get('/bookings', getAllBookings);
 // Payments
 router.get('/payments', getAllPayments);
 
-// Complaints
-router.get('/complaints', getComplaints);
-router.put('/complaints/:id', updateComplaint);
+// Complaints & Disputes
+router.get('/complaints', acGetComplaints);
+router.get('/complaints/:id', getComplaintDetail);
+router.put('/complaints/:id', acUpdateComplaint);
+router.post('/complaints/:id/respond', acRespond);
+router.post('/complaints/:id/propose-resolution', proposeResolution);
+router.post('/complaints/:id/finalize-resolution', finalizeResolution);
+router.post('/complaints/:id/escalate', escalate);
+router.post('/complaints/:id/suspend-worker', suspendWorker);
 
 // Training (admin)
 router.post('/trainings', createTraining);

@@ -4,6 +4,7 @@ import api from '../../services/api';
 import MapComponent from '../../components/MapComponent';
 import { getSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
+import { COMPLAINT_CATEGORIES, PREFERRED_RESOLUTIONS } from '../../utils/complaints';
 
 const TRACKING_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'STARTED'];
 
@@ -25,6 +26,10 @@ export default function BookingDetails() {
   const [loading, setLoading] = useState(true);
   const [workerLocation, setWorkerLocation] = useState(null);
   const [syncedAt, setSyncedAt] = useState(null);
+  const [showComplaint, setShowComplaint] = useState(false);
+  const [complaintForm, setComplaintForm] = useState({ category: '', description: '', preferredResolution: 'FULL_REFUND' });
+  const [complaintFiles, setComplaintFiles] = useState([]);
+  const [filingComplaint, setFilingComplaint] = useState(false);
 
   const load = async () => {
     try {
@@ -124,6 +129,33 @@ export default function BookingDetails() {
       load();
     } catch (err) {
       toast.error(err.message || 'Failed');
+    }
+  };
+
+  const submitComplaint = async (e) => {
+    e.preventDefault();
+    if (!complaintForm.category || !complaintForm.description.trim()) {
+      toast.error('Category and description are required');
+      return;
+    }
+    try {
+      setFilingComplaint(true);
+      const fd = new FormData();
+      fd.append('bookingId', id);
+      fd.append('category', complaintForm.category);
+      fd.append('description', complaintForm.description.trim());
+      fd.append('preferredResolution', complaintForm.preferredResolution);
+      complaintFiles.forEach((f, i) => fd.append('evidence', f));
+      await api.post('/complaints', fd);
+      toast.success('Complaint filed! Our team will review it.');
+      setShowComplaint(false);
+      setComplaintForm({ category: '', description: '', preferredResolution: 'FULL_REFUND' });
+      setComplaintFiles([]);
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to file complaint');
+    } finally {
+      setFilingComplaint(false);
     }
   };
 
@@ -300,6 +332,9 @@ export default function BookingDetails() {
           {booking.status === 'COMPLETED' && (
             <button onClick={() => handleReview(5)} className="btn-accent text-sm">⭐ Rate (5 stars)</button>
           )}
+          {booking.status === 'COMPLETED' && (
+            <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">⚠ Raise a Complaint</button>
+          )}
         </div>
       </div>
 
@@ -318,6 +353,78 @@ export default function BookingDetails() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Raise Complaint modal */}
+      {showComplaint && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">Raise a Complaint</h3>
+              <button onClick={() => setShowComplaint(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <form onSubmit={submitComplaint} className="p-6 space-y-4">
+              <p className="text-sm text-gray-500">
+                Booking {booking.bookingNumber} — your complaint and evidence will only be visible to you and our support team.
+              </p>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Category *</label>
+                <select
+                  value={complaintForm.category}
+                  onChange={(e) => setComplaintForm({ ...complaintForm, category: e.target.value })}
+                  className="input-field mt-1"
+                >
+                  <option value="">Select a category</option>
+                  {COMPLAINT_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Describe the issue *</label>
+                <textarea
+                  value={complaintForm.description}
+                  onChange={(e) => setComplaintForm({ ...complaintForm, description: e.target.value })}
+                  rows={4}
+                  maxLength={2000}
+                  className="input-field mt-1"
+                  placeholder="What went wrong? Please share as much detail as possible."
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">What would resolve this?</label>
+                <select
+                  value={complaintForm.preferredResolution}
+                  onChange={(e) => setComplaintForm({ ...complaintForm, preferredResolution: e.target.value })}
+                  className="input-field mt-1"
+                >
+                  {PREFERRED_RESOLUTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Supporting evidence (photos, docs, short video)</label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,video/mp4,video/quicktime"
+                  onChange={(e) => setComplaintFiles([...e.target.files])}
+                  className="mt-1 w-full text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-sm file:font-medium"
+                />
+                {complaintFiles.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">{complaintFiles.length} file(s) selected</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowComplaint(false)} className="btn-secondary text-sm">Cancel</button>
+                <button type="submit" disabled={filingComplaint} className="btn-primary text-sm">
+                  {filingComplaint ? 'Filing…' : 'Submit Complaint'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

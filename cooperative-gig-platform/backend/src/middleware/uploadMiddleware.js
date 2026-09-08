@@ -52,4 +52,33 @@ const upload = multer({
 const getUploadBaseUrl = (req) =>
   `${req.protocol}://${req.get('host')}/uploads`;
 
-module.exports = { upload, uploadDir, getUploadBaseUrl };
+// Evidence upload — images, documents, short videos (complaints & disputes)
+const evidenceFileFilter = (req, file, cb) => {
+  const allowedMime = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/heic',
+    'application/pdf',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+  ];
+  if (allowedMime.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files, PDFs and short videos are allowed as evidence'), false);
+  }
+};
+
+const uploadEvidence = multer({
+  storage,
+  fileFilter: evidenceFileFilter,
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+    files: 10,
+  },
+});
+
+module.exports = { upload, uploadEvidence, uploadDir, getUploadBaseUrl };

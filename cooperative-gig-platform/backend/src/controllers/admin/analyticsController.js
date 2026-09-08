@@ -4,35 +4,19 @@ const Forecast = require('../../models/Forecast');
 const Worker = require('../../models/WorkerProfile');
 const Service = require('../../models/Service');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
-const forecastingService = require('../../services/ai/forecastingService');
-const allocationService = require('../../services/ai/allocationService');
+const forecastingService = require('../../services/ai/demandForecastService');
+const allocationService = require('../../services/ai/workforceAllocationService');
 
-// Get forecast for specified dates
+// Get forecast for specified dates (ML model-backed)
 const getForecasts = asyncHandler(async (req, res) => {
-  const { date, refresh } = req.query;
-
-  let forecasts;
-  if (refresh === 'true') {
-    // Generate fresh forecasts
-    const newForecasts = await forecastingService.forecastDemand(3);
-    await forecastingService.persistForecasts(newForecasts);
-  }
-
-  const query = {};
-  if (date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    query.forecastDate = {
-      $gte: d,
-      $lt: new Date(d.getTime() + 24 * 60 * 60 * 1000),
-    };
-  } else {
-    query.forecastDate = { $gte: new Date() };
-  }
-
-  forecasts = await Forecast.find(query).sort({ forecastDate: 1, expectedRequests: -1 });
-
-  res.json({ success: true, data: forecasts });
+  const { date, zone, days = 3, refresh } = req.query;
+  const data = await forecastingService.getForecasts({
+    refresh: refresh === 'true',
+    days: Math.min(14, Math.max(1, Number(days) || 3)),
+    zone,
+    date,
+  });
+  res.json({ success: true, data });
 });
 
 // Get workforce allocation analysis

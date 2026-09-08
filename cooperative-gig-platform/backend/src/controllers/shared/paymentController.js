@@ -1,4 +1,5 @@
 const Booking = require('../../models/Booking');
+const Payment = require('../../models/Payment');
 const Invoice = require('../../models/Invoice');
 const Worker = require('../../models/WorkerProfile');
 const Notification = require('../../models/Notification');
@@ -28,6 +29,24 @@ const initiatePayment = asyncHandler(async (req, res) => {
 
   if (booking.status !== 'COMPLETED') {
     throw new ApiError('Booking must be completed before payment', 400);
+  }
+
+  // Idempotency guard: an already-processed payment must not be re-created
+  if (booking.payment) {
+    const existingPayment = await Payment.findById(booking.payment);
+    if (existingPayment && existingPayment.status === 'SUCCESS') {
+      const existingInvoice = booking.invoice ? await Invoice.findById(booking.invoice) : null;
+      return res.json({
+        success: true,
+        message: 'Payment already processed',
+        alreadyProcessed: true,
+        data: {
+          payment: existingPayment,
+          invoice: existingInvoice,
+          result: { status: 'SUCCESS', transactionId: existingPayment.transactionId },
+        },
+      });
+    }
   }
 
   const coop = await Cooperative.findOne().sort({ createdAt: -1 });

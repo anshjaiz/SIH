@@ -18,6 +18,7 @@ import Services from './pages/customer/Services';
 import CreateRequest from './pages/customer/CreateRequest';
 import MyBookings from './pages/customer/MyBookings';
 import BookingDetails from './pages/customer/BookingDetails';
+import MyComplaints from './pages/customer/MyComplaints';
 
 // Worker pages
 import WorkerDashboard from './pages/worker/WorkerDashboard';
@@ -27,6 +28,7 @@ import ActiveJobs from './pages/worker/ActiveJobs';
 import Earnings from './pages/worker/Earnings';
 import Welfare from './pages/worker/Welfare';
 import Collaborations from './pages/worker/collaborator/Collaborations';
+import WorkerComplaints from './pages/worker/WorkerComplaints';
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -93,6 +95,7 @@ export default function App() {
             <Route path="services/request/:serviceId" element={<CreateRequest />} />
             <Route path="bookings" element={<MyBookings />} />
             <Route path="bookings/:id" element={<BookingDetails />} />
+            <Route path="complaints" element={<MyComplaints />} />
           </Route>
 
           {/* Worker routes */}
@@ -104,6 +107,7 @@ export default function App() {
             <Route path="earnings" element={<Earnings />} />
             <Route path="welfare" element={<Welfare />} />
             <Route path="collaborations" element={<Collaborations />} />
+            <Route path="complaints" element={<WorkerComplaints />} />
           </Route>
 
           {/* Admin routes */}

@@ -20,6 +20,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const complaintRoutes = require('./routes/complaintRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 // Initialize express app
 const app = express();
@@ -107,6 +108,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/collaborations', require('./routes/collaboratorRoutes'));
+app.use('/api/ai', aiRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -130,6 +132,11 @@ const startServer = async () => {
     server.listen(port, () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`Health check: http://localhost:${port}/api/health`);
+      // Warm-up: run the AI pipeline quietly in the background so forecasts
+      // and learned models exist from the very first request.
+      require('./services/ai/aiPipelineService')
+        .runPipeline({ quiet: true })
+        .catch(() => {});
     });
   } catch (err) {
     console.error(`Failed to start server: ${err.message}`);

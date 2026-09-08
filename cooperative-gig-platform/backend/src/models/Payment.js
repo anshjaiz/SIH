@@ -61,6 +61,7 @@ const paymentSchema = new mongoose.Schema(
       index: true,
     },
     paymentDate: Date,
+    refundedAt: Date,
     // Shared earnings breakdown with worker
     workerGross: {
       type: Number,

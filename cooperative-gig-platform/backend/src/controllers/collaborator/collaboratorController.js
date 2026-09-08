@@ -1,6 +1,7 @@
 const Booking = require('../../models/Booking');
 const Worker = require('../../models/WorkerProfile');
 const CollaborationRequest = require('../../models/CollaborationRequest');
+const JobTeam = require('../../models/JobTeam');
 const WorkerAvailability = require('../../models/WorkerAvailability');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const {
@@ -207,6 +208,92 @@ const cancelCollaborationRequest = asyncHandler(async (req, res) => {
 
 // -------------------- Team --------------------
 
+// Helper-side: acceptance list + component, so collaborators see "where I'm working".
+async function enrichOwnTeamJob(team, workerId) {
+  const [lead, customer] = await Promise.all([
+    Worker.findById(team.leadWorker).populate('user', 'name email phone avatar'),
+    Booking.findById(team.booking).populate('customer', 'name phone').populate('service', 'name'),
+  ]);
+  const request = team.collaborationRequest
+    ? await CollaborationRequest.findById(team.collaborationRequest)
+    : null;
+  const my = (team.members || []).find((m) => m.worker.toString() === workerId.toString());
+  return {
+    teamId: team._id,
+    myStatus: my ? my.status : null,
+    myRole: my ? my.role : null,
+    paymentEstimate: my ? my.paymentEstimate : 0,
+    joinedAt: my ? my.joinedAt : null,
+    completed: team.completed,
+    booking: customer
+      ? {
+          bookingNumber: customer.bookingNumber,
+          service: customer.service ? customer.service.name : customer.serviceSnapshot?.name,
+          status: customer.status,
+          address: customer.address,
+          city: customer.city,
+          location: customer.location,
+          customer: { name: customer.customer?.name, phone: customer.customer?.phone },
+          requestedDate: customer.requestedDate,
+          priceBreakdown: customer.priceBreakdown,
+        }
+      : null,
+    lead: lead
+      ? { name: lead.user?.name, phone: lead.user?.phone, rating: lead.rating }
+      : null,
+    schedule: request
+      ? {
+          date: request.date,
+          startTime: request.startTime,
+          durationHours: request.durationHours,
+          instructions: request.instructions,
+        }
+      : null,
+  };
+}
+
+const getMyTeamJobs = asyncHandler(async (req, res) => {
+  const workerId = await getWorkerId(req.user._id);
+  if (!workerId) return res.json({ success: true, data: [] });
+
+  const teams = await JobTeam.find({
+    'members.worker': workerId,
+    'members.status': { $in: ['ACCEPTED', 'COMPLETED'] },
+  }).sort({ updatedAt: -1 });
+
+  const data = await Promise.all(teams.map((t) => enrichOwnTeamJob(t, workerId)));
+  res.json({ success: true, data });
+});
+
+// Collaborator marks themselves as on-the-way / arrived for an accepted collaboration.
+const checkInToTeam = asyncHandler(async (req, res) => {
+  const workerId = await getWorkerId(req.user._id);
+  if (!workerId) throw new ApiError('Worker profile not found', 404);
+
+  const team = await JobTeam.findById(req.params.id);
+  if (!team) throw new ApiError('Team not found', 404);
+
+  const member = (team.members || []).find((m) => m.worker.toString() === workerId.toString());
+  if (!member) throw new ApiError('You are not a member of this team', 403);
+  if (member.status !== 'ACCEPTED') throw new ApiError('Only accepted collaborators can check in', 400);
+  if (!member.joinedAt) member.joinedAt = new Date();
+  await team.save();
+
+  notifyLeadWorker(
+    {
+      _id: team.collaborationRequest,
+      booking: team.booking,
+      status: 'OPEN',
+      role: member.role,
+      leadWorker: team.leadWorker,
+    },
+    `${req.user.name} is on the way!`,
+    team
+  );
+
+  res.json({ success: true, message: 'Checked in — stay safe, see you on the job!', data: await enrichOwnTeamJob(team, workerId) });
+});
+
 const getJobTeam = asyncHandler(async (req, res) => {
   const bookingId = req.params.bookingId;
   if (!bookingId) throw new ApiError('bookingId is required', 400);
@@ -225,17 +312,28 @@ const getJobTeam = asyncHandler(async (req, res) => {
     return res.json({ success: true, data: null });
   }
 
+  // team.members[].worker / team.leadWorker are populated objects the second
+  // time a route is hit, so normalize to ids before re-lookup.
+  const idOf = (v) => (v && v._id ? v._id : v);
+
   // enrich member workers + lead
   const workerDocs = await Worker.find({
-    _id: { $in: team.members.map((m) => m.worker).concat([team.leadWorker]) },
+    _id: {
+      $in: [
+        ...team.members.map((m) => idOf(m.worker)),
+        idOf(team.leadWorker),
+      ].filter(Boolean),
+    },
   }).populate('user', 'name email phone avatar');
 
-  const byId = (id) => workerDocs.find((w) => w._id.toString() === id.toString());
+  const byId = (id) => workerDocs.find((w) => w._id.toString() === idOf(id).toString());
   const payload = {
     ...team.toObject(),
+    leadWorker: idOf(team.leadWorker),
     lead: byId(team.leadWorker) ? { user: byId(team.leadWorker).user, rating: byId(team.leadWorker).rating } : null,
     members: team.members.map((m) => ({
       ...m.toObject(),
+      worker: idOf(m.worker),
       workerProfile: byId(m.worker) ? { user: byId(m.worker).user, rating: byId(m.worker).rating, collaborationsCount: byId(m.worker).collaborationsCount } : null,
     })),
   };
@@ -294,5 +392,7 @@ module.exports = {
   respondCollaborationRequest,
   cancelCollaborationRequest,
   getJobTeam,
+  getMyTeamJobs,
+  checkInToTeam,
   getCollaboratorProfile,
 };

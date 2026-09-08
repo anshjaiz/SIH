@@ -8,6 +8,8 @@ const {
   respondCollaborationRequest,
   cancelCollaborationRequest,
   getJobTeam,
+  getMyTeamJobs,
+  checkInToTeam,
   getCollaboratorProfile,
 } = require('../controllers/collaborator/collaboratorController');
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -27,6 +29,8 @@ router.post('/requests/:id/respond', authorize('worker'), respondCollaborationRe
 router.put('/requests/:id/cancel', authorize('worker'), cancelCollaborationRequest);
 
 // Job team
+router.get('/teams/mine', authorize('worker'), getMyTeamJobs);
+router.post('/teams/:id/checkin', authorize('worker'), checkInToTeam);
 router.get('/teams/booking/:bookingId', getJobTeam);
 
 module.exports = router;

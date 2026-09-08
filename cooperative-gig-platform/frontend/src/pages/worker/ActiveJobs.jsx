@@ -11,6 +11,7 @@ export default function ActiveJobs() {
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState({});
   const [requests, setRequests] = useState({});
+  const [helperLocs, setHelperLocs] = useState({});
   const [requestingFor, setRequestingFor] = useState(null);
 
   const load = async () => {
@@ -23,13 +24,32 @@ export default function ActiveJobs() {
 
   useEffect(() => { load(); }, []);
 
-  // Load collaboration team for each active job (once per booking)
+  // Store team [+ seed helper's last-known location from the team record]
+  const applyTeam = (bookingId, team) => {
+    setTeams((prev) => ({ ...prev, [bookingId]: team }));
+    if (team && Array.isArray(team.members)) {
+      const seed = {};
+      team.members.forEach((m) => {
+        if (m.worker && m.location && Array.isArray(m.location.coordinates)) {
+          seed[m.worker] = m.location.coordinates;
+        }
+      });
+      if (Object.keys(seed).length) setHelperLocs((prev) => ({ ...prev, ...seed }));
+    }
+  };
+
+  // Load collaboration team + sent invites for each active job (once per booking)
   useEffect(() => {
     jobs.forEach((job) => {
       if (teams[job._id] === undefined) {
         getJobTeam(job._id)
-          .then((res) => setTeams((prev) => ({ ...prev, [job._id]: res.data })))
+          .then((res) => applyTeam(job._id, res.data))
           .catch(() => setTeams((prev) => ({ ...prev, [job._id]: null })));
+      }
+      if (requests[job._id] === undefined) {
+        getRequestsForBooking(job._id)
+          .then((res) => setRequests((prev) => ({ ...prev, [job._id]: res.data || [] })))
+          .catch(() => setRequests((prev) => ({ ...prev, [job._id]: [] })));
       }
     });
   }, [jobs]);
@@ -41,13 +61,26 @@ export default function ActiveJobs() {
     const onUpdate = (payload) => {
       const bookingId = payload?.bookingId || payload?.request?.booking;
       if (bookingId) {
-        getJobTeam(bookingId)
-          .then((res) => setTeams((prev) => ({ ...prev, [bookingId]: res.data })))
-          .catch(() => {});
+        Promise.all([
+          getJobTeam(bookingId).then((res) => res.data).catch(() => null),
+          getRequestsForBooking(bookingId).then((res) => res.data || []).catch(() => []),
+        ]).then(([team, reqs]) => {
+          applyTeam(bookingId, team);
+          setRequests((prev) => ({ ...prev, [bookingId]: reqs }));
+        });
       }
     };
     socket.on('collaboration_update', onUpdate);
-    return () => socket.off('collaboration_update', onUpdate);
+    const onHelperLoc = (payload) => {
+      if (payload?.helperId && Array.isArray(payload?.coordinates)) {
+        setHelperLocs((prev) => ({ ...prev, [payload.helperId]: payload.coordinates }));
+      }
+    };
+    socket.on('worker_location', onHelperLoc);
+    return () => {
+      socket.off('collaboration_update', onUpdate);
+      socket.off('worker_location', onHelperLoc);
+    };
   }, []);
 
   // Live location sharing: while an active job is ON_THE_WAY or STARTED,
@@ -166,19 +199,46 @@ export default function ActiveJobs() {
                 </div>
               </div>
 
-              {/* Collaboration team */}
+              {/* Collaboration */}
               {(teams[job._id] !== undefined || ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'].includes(job.status)) && (
                 <div className="mt-4">
                   {teams[job._id] ? (
-                    <JobTeamCard team={teams[job._id]} />
-                  ) : requests[job._id] ? (
-                    <div className="flex items-center justify-between p-3 bg-brand-50 rounded-xl">
-                      <p className="text-sm text-gray-600">
-                        📨 Collab invite sent · waiting for <span className="font-medium">{requests[job._id].role}</span> to accept…
+                    <JobTeamCard team={teams[job._id]} helperLocs={helperLocs} bookingLocation={job.location?.coordinates} />
+                  ) : (requests[job._id] || []).length > 0 ? (
+                    <div className="p-4 bg-brand-50 rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-gray-700">📨 Invitations sent to your team</p>
+                        <button onClick={() => setRequestingFor(job)} className="text-xs text-brand-600 hover:underline">
+                          + Add more
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {requests[job._id].map((req) =>
+                          (req.candidates || []).map((c) => (
+                            <div key={req._id + c.worker?._id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                              <div>
+                                <span className="text-sm font-medium text-gray-800">{c.worker?.user?.name || 'Worker'}</span>
+                                <span className="text-xs text-gray-400 ml-1">· {req.role}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {c.score != null && (
+                                  <span className="text-xs text-gray-500">Match {Math.round(c.score)}%</span>
+                                )}
+                                <span className={`badge px-2 py-0.5 ${
+                                  c.status === 'ACCEPTED' ? 'bg-green-100 text-green-700'
+                                  : c.status === 'DECLINED' ? 'bg-red-100 text-red-600'
+                                  : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {c.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-2">
+                        The worker sees this invite under their <span className="font-medium">Collaborations</span> page.
                       </p>
-                      <button onClick={() => setRequestingFor(job)} className="text-sm text-brand-600 hover:underline">
-                        View / Edit
-                      </button>
                     </div>
                   ) : teams[job._id] === null ? (
                     <div className="flex items-center justify-between p-3 bg-brand-50 rounded-xl">
@@ -202,13 +262,15 @@ export default function ActiveJobs() {
         open={requestingFor !== null}
         booking={requestingFor}
         onClose={() => setRequestingFor(null)}
-        onCreated={(created) => {
+        onCreated={() => {
           if (requestingFor) {
-            setRequests((prev) => ({ ...prev, [requestingFor._id]: created.request }));
-            getJobTeam(requestingFor._id)
-              .then((res) => setTeams((prev) => ({ ...prev, [requestingFor._id]: res.data })))
-              .catch(() => setTeams((prev) => ({ ...prev, [requestingFor._id]: null })));
-            getRequestsForBooking(requestingFor._id).catch(() => {});
+            Promise.all([
+              getJobTeam(requestingFor._id).then((res) => res.data).catch(() => null),
+              getRequestsForBooking(requestingFor._id).then((res) => res.data || []).catch(() => []),
+            ]).then(([team, reqs]) => {
+              applyTeam(requestingFor._id, team);
+              setRequests((prev) => ({ ...prev, [requestingFor._id]: reqs }));
+            });
           }
         }}
       />

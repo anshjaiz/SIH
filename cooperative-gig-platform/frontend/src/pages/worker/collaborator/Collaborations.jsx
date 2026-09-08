@@ -2,9 +2,11 @@ import { useState } from 'react';
 import useCollaborator from '../../../hooks/useCollaborator';
 import CollaborationInviteCard from '../../../components/collaborator/CollaborationInviteCard';
 import CollaboratorProfileCard from '../../../components/collaborator/CollaboratorProfileCard';
+import MyTeamJobs from '../../../components/collaborator/MyTeamJobs';
 
 export default function Collaborations() {
   const { invites, loading, refresh, respond } = useCollaborator();
+  const [tab, setTab] = useState('jobs');
   const [respondingId, setRespondingId] = useState(null);
 
   const handleRespond = async (requestId, action) => {
@@ -12,6 +14,11 @@ export default function Collaborations() {
     await respond(requestId, action);
     setRespondingId(null);
   };
+
+  const tabs = [
+    { id: 'jobs', label: `✅ My Team Jobs` },
+    { id: 'invites', label: `🤝 Opportunities${invites.length ? ` (${invites.length})` : ''}` },
+  ];
 
   return (
     <div className="space-y-6">
@@ -22,12 +29,22 @@ export default function Collaborations() {
         </p>
       </div>
 
+      <div className="flex gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`badge px-4 py-2 ${tab === t.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <CollaboratorProfileCard />
 
-      <div>
-        <h3 className="font-semibold text-gray-900 mb-3">Incoming opportunities</h3>
-
-        {loading ? (
+      {tab === 'invites' ? (
+        loading ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
           </div>
@@ -48,13 +65,9 @@ export default function Collaborations() {
               />
             ))}
           </div>
-        )}
-      </div>
-
-      {invites.length > 0 && (
-        <button onClick={refresh} className="text-sm text-brand-600 hover:underline">
-          ↻ Refresh invites
-        </button>
+        )
+      ) : (
+        <MyTeamJobs />
       )}
     </div>
   );

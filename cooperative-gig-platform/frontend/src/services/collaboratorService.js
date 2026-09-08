@@ -12,6 +12,8 @@ export const cancelCollaborationRequest = (id) => api.put(`/collaborations/reque
 
 // Teams
 export const getJobTeam = (bookingId) => api.get(`/collaborations/teams/booking/${bookingId}`);
+export const getMyTeamJobs = () => api.get('/collaborations/teams/mine');
+export const checkInToTeam = (teamId) => api.post(`/collaborations/teams/${teamId}/checkin`);
 
 // Profiles
 export const getCollaboratorProfile = (workerId) =>

@@ -5,7 +5,29 @@ const MEMBER_STATUS_COLORS = {
   COMPLETED: 'bg-gray-200 text-gray-700',
 };
 
-export default function JobTeamCard({ team, onRefresh }) {
+const toRad = (n) => (n * Math.PI) / 180;
+const haversineKm = (a, b) => {
+  if (!a || !b) return null;
+  const coords = Array.isArray(b) ? b : b.coordinates;
+  const [lng1, lat1] = a;
+  const [lng2, lat2] = coords || [];
+  if ([lng1, lat1, lng2, lat2].some((v) => v == null)) return null;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+};
+const fmtAgo = (d) => {
+  const dt = new Date(d);
+  if (isNaN(dt)) return '';
+  const s = Math.floor((Date.now() - dt.getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
+};
+
+export default function JobTeamCard({ team, helperLocs = {}, bookingLocation }) {
   if (!team) return null;
 
   const accepted = team.members.filter((m) => m.status === 'ACCEPTED' || m.status === 'COMPLETED');
@@ -33,26 +55,33 @@ export default function JobTeamCard({ team, onRefresh }) {
           </div>
           <span className="text-xs text-gray-400">Rating {team.lead?.rating || '—'}</span>
         </div>
-        {team.members.map((m, i) => (
-          <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
-            <div className="text-sm">
-              <span className="font-medium text-gray-800">{m.workerProfile?.user?.name || 'Worker'}</span>
-              <span className="text-gray-400"> · {m.role}</span>
+        {team.members.map((m, i) => {
+          const loc = helperLocs[m.worker] || m.location?.coordinates;
+          const km = loc ? haversineKm(bookingLocation, loc) : null;
+          const tracked = m.status === 'ACCEPTED' && km != null && !team.completed;
+          const lastSeen = m.lastLocationUpdate ? fmtAgo(m.lastLocationUpdate) : null;
+          return (
+            <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+              <div className="text-sm">
+                <span className="font-medium text-gray-800">{m.workerProfile?.user?.name || 'Worker'}</span>
+                <span className="text-gray-400"> · {m.role}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {tracked && (
+                  <span className="badge bg-red-100 text-red-700">🟢 {km.toFixed(1)} km{lastSeen ? ` · ${lastSeen}` : ''}</span>
+                )}
+                {m.paymentEstimate > 0 && (
+                  <span className="text-xs text-brand-700 font-medium">₹{m.paymentEstimate}</span>
+                )}
+                <span className={`badge px-2 py-0.5 ${MEMBER_STATUS_COLORS[m.status]}`}>{m.status}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {m.paymentEstimate > 0 && (
-                <span className="text-xs text-brand-700 font-medium">₹{m.paymentEstimate}</span>
-              )}
-              <span className={`badge px-2 py-0.5 ${MEMBER_STATUS_COLORS[m.status]}`}>{m.status}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {onRefresh && (
-        <button onClick={onRefresh} className="mt-3 text-xs text-brand-600 hover:underline">
-          ↻ Refresh
-        </button>
+      {helperLocs && Object.keys(helperLocs).length > 0 && (
+        <p className="text-[11px] text-gray-400 mt-2">🟢 Live location updates arrive every 10s from collaborating helpers.</p>
       )}
     </div>
   );

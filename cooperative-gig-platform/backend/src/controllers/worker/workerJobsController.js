@@ -1,5 +1,6 @@
 const Booking = require('../../models/Booking');
 const Worker = require('../../models/WorkerProfile');
+const JobTeam = require('../../models/JobTeam');
 const Notification = require('../../models/Notification');
 const Payment = require('../../models/Payment');
 const Invoice = require('../../models/Invoice');
@@ -271,6 +272,31 @@ const updateLocation = asyncHandler(async (req, res) => {
       bookingId: activeBooking._id,
       coordinates,
     });
+  }
+
+  // Helper tracking: if this worker is a checked-in collaborator on an active
+  // team, persist + broadcast their live location to the lead worker's room.
+  const io = getIO();
+  if (io) {
+    const teams = await JobTeam.find({
+      'members.worker': worker._id,
+      'members.status': 'ACCEPTED',
+      completed: false,
+    });
+    for (const team of teams) {
+      const member = (team.members || []).find((m) => m.worker.toString() === worker._id.toString());
+      if (!member || !member.joinedAt) continue;
+      member.location = { type: 'Point', coordinates };
+      member.lastLocationUpdate = new Date();
+      await team.save();
+      io.to(`worker_${team.leadWorker.toString()}`).emit('worker_location', {
+        helperId: worker._id,
+        bookingId: team.booking,
+        role: member.role,
+        coordinates,
+        lastLocationUpdate: member.lastLocationUpdate,
+      });
+    }
   }
 
   res.json({ success: true, message: 'Location updated' });

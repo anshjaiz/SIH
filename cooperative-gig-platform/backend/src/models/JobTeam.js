@@ -40,6 +40,12 @@ const jobTeamSchema = new mongoose.Schema(
         },
         invitedAt: Date,
         acceptedAt: Date,
+        joinedAt: Date,
+        location: {
+          type: { type: String, enum: ['Point'], default: 'Point' },
+          coordinates: { type: [Number], default: undefined },
+        },
+        lastLocationUpdate: Date,
       },
     ],
     completed: {

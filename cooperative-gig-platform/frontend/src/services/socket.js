@@ -9,7 +9,7 @@ export const connectSocket = (user, profile) => {
 
   disconnectSocket();
 
-  socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5001', {
+  socket = io(import.meta.env.VITE_API_URL || '', {
     transports: ['websocket', 'polling'],
     autoConnect: true,
   });

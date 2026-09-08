@@ -1,0 +1,17 @@
+{
+  "app": {
+    "name": "Aman Seva Cooperative",
+    "tagline": "Cooperative Gig Services Platform",
+    "dashboard": "Dashboard",
+    "services": "Services",
+    "bookings": "My Bookings",
+    "logout": "Logout"
+  },
+  "auth": {
+    "login": "Sign in",
+    "register": "Create Account",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?"
+  }
+}

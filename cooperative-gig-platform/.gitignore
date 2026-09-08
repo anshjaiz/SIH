@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+.yarn-error.log*
+
+# Build
+dist/
+build/
+*.local
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads (keep folder but ignore content)
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/

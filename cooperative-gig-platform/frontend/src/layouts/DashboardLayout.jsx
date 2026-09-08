@@ -1,0 +1,48 @@
+import { useState } from 'react';
+import { Outlet } from 'react-router-dom';
+import Sidebar from '../components/Sidebar';
+import { HiOutlineBell } from 'react-icons/hi';
+import { useAuth } from '../context/AuthContext';
+
+export default function DashboardLayout({ role }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { user } = useAuth();
+
+  const roleLabel = {
+    customer: 'Customer',
+    worker: 'Worker',
+    admin: 'Cooperative Admin',
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar role={role} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
+
+      {/* Main content */}
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+        {/* Top bar */}
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30">
+          <div>
+            <h1 className="font-semibold text-gray-800">{roleLabel[role] || 'Dashboard'}</h1>
+            <p className="text-xs text-gray-500">Aman Seva Cooperative</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button className="relative p-2 text-gray-500 hover:text-gray-700">
+              <HiOutlineBell className="w-5 h-5" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            <div className="text-sm text-gray-700 hidden sm:block">
+              <span className="font-medium">{user?.name}</span>
+              <span className="text-gray-400 ml-2 text-xs">({user?.role})</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}

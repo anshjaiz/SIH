@@ -1,0 +1,18 @@
+import api from './api';
+
+// Requests
+export const createCollaborationRequest = (payload) => api.post('/collaborations/requests', payload);
+export const getMyCollaborationRequests = () => api.get('/collaborations/requests/mine');
+export const getCollaborationRequest = (id) => api.get(`/collaborations/requests/${id}`);
+export const getRequestsForBooking = (bookingId) => api.get(`/collaborations/requests/booking/${bookingId}`);
+
+// Responding
+export const respondCollaborationRequest = (id, action) => api.post(`/collaborations/requests/${id}/respond`, { action });
+export const cancelCollaborationRequest = (id) => api.put(`/collaborations/requests/${id}/cancel`);
+
+// Teams
+export const getJobTeam = (bookingId) => api.get(`/collaborations/teams/booking/${bookingId}`);
+
+// Profiles
+export const getCollaboratorProfile = (workerId) =>
+  api.get(workerId ? `/collaborations/profile/${workerId}` : '/collaborations/profile');

@@ -1,0 +1,114 @@
+import { useEffect, useState, useCallback, useRef } from 'react';
+import api from '../../services/api';
+import { getSocket } from '../../services/socket';
+import toast from 'react-hot-toast';
+import MapComponent from '../../components/MapComponent';
+
+export default function JobRequests() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const timeoutRef = useRef(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api.get('/workers/jobs/requests');
+      setRequests(res.data || []);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(load, 5000);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    load();
+    const socket = getSocket();
+    const onNewJob = () => load();
+    if (socket) socket.on('new_job', onNewJob);
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (socket) socket.off('new_job', onNewJob);
+    };
+  }, [load]);
+
+  const handleAccept = async (id) => {
+    try {
+      await api.post(`/workers/jobs/${id}/accept`);
+      toast.success('Job accepted!');
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
+  const handleReject = async (id) => {
+    if (!window.confirm('Reject this job?')) return;
+    try {
+      await api.post(`/workers/jobs/${id}/reject`);
+      toast.success('Job rejected');
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-900">Job Requests</h2>
+
+      {loading ? (
+        <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div></div>
+      ) : requests.length === 0 ? (
+        <div className="text-center py-20 text-gray-400">No pending job requests</div>
+      ) : (
+        <div className="space-y-4">
+          {requests.map((job) => (
+            <div key={job._id} className={`card ${job.isEmergency ? 'border-l-4 border-orange-500' : ''}`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold">{job.serviceSnapshot?.name}</h3>
+                  <p className="text-sm text-gray-500">{job.bookingNumber} • {job.serviceSnapshot?.category}</p>
+                  {job.isEmergency && <span className="badge bg-orange-100 text-orange-700 mt-1">⚡ EMERGENCY</span>}
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-brand-600">₹{job.priceBreakdown?.total}</p>
+                  <p className="text-xs text-gray-500">Match: {job.matchScore}/100</p>
+                </div>
+              </div>
+
+              <div className="mt-4 text-sm text-gray-600 space-y-1">
+                <p>📍 {job.address}</p>
+                <p>📅 {new Date(job.requestedDate).toLocaleString()}</p>
+                <p>⏰ {job.timeSlot}</p>
+                {job.description && <p className="text-gray-500 italic">"{job.description}"</p>}
+              </div>
+
+              {/* Match reasons */}
+              {job.matchReasons?.length > 0 && (
+                <div className="mt-3 bg-gray-50 p-3 rounded-lg text-xs text-gray-600">
+                  <p className="font-medium mb-1">Why you were matched:</p>
+                  {job.matchReasons.map((r, i) => <p key={i}>• {r}</p>)}
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => handleAccept(job._id)} className="btn-success flex-1">Accept Job</button>
+                <button onClick={() => handleReject(job._id)} className="btn-danger flex-1">Reject</button>
+              </div>
+
+              {job.location?.coordinates && (
+                <div className="mt-4">
+                  <MapComponent
+                    center={[job.location.coordinates[1], job.location.coordinates[0]]}
+                    markers={[{ lat: job.location.coordinates[1], lng: job.location.coordinates[0], label: job.serviceSnapshot?.name }]}
+                    height="150px"
+                    zoom={14}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -36,6 +36,17 @@ const {
   getAnalytics,
 } = require('../controllers/admin/analyticsController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const {
+  listReliabilityWorkers,
+  getWorkerReliabilityDetail,
+  adjustWorkerReliability,
+  suspendWorkerReliability,
+  reactivateWorkerReliability,
+  getAppeals,
+  reviewAppeal,
+  getReliabilitySettings,
+  updateReliabilitySettings,
+} = require('../controllers/reliability/adminReliabilityController');
 
 // All admin routes protected + admin only
 router.use(protect, authorize('admin'));
@@ -55,6 +66,18 @@ router.get('/workers', getWorkers);
 router.get('/workers/:id', getWorkerDetail);
 router.put('/workers/:id/status', updateWorkerStatus);
 router.patch('/workers/:id/skills/:skillId', updateWorkerSkillVerification);
+
+// Reliability management
+router.get('/reliability/workers', listReliabilityWorkers);
+router.get('/reliability/workers/:workerId', getWorkerReliabilityDetail);
+router.post('/reliability/workers/:workerId/adjust', adjustWorkerReliability);
+router.post('/reliability/workers/:workerId/suspend', suspendWorkerReliability);
+router.post('/reliability/workers/:workerId/reactivate', reactivateWorkerReliability);
+router.get('/reliability/appeals', getAppeals);
+router.post('/reliability/appeals/:id/approve', reviewAppeal);
+router.post('/reliability/appeals/:id/reject', reviewAppeal);
+router.get('/reliability/settings', getReliabilitySettings);
+router.put('/reliability/settings', updateReliabilitySettings);
 
 // Certificates
 router.get('/certificates', getCertificates);

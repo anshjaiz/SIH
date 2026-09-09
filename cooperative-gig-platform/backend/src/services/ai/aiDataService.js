@@ -145,7 +145,7 @@ const buildMatchingDataset = async ({
 } = {}) => {
   const source = bookings || (await Booking.find({
     worker: { $exists: true },
-    status: { $in: ['COMPLETED', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED', 'DISPUTED'] },
+    status: { $in: ['COMPLETED', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'DISPUTED'] },
   }).select('worker service location requestedDate isEmergency status').lean());
 
   const workerIds = [...new Set(source.map((b) => b.worker))];

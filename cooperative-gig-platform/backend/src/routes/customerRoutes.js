@@ -10,6 +10,7 @@ const {
   createServiceRequest,
   getBookingById,
   cancelBooking,
+  requestReassignment,
 } = require('../controllers/customer/bookingController');
 const {
   getInvoiceByBooking,
@@ -37,6 +38,7 @@ router.get('/bookings', protect, getBookings);
 router.post('/bookings', protect, upload.array('images', 5), createServiceRequest);
 router.get('/bookings/:id', protect, getBookingById);
 router.put('/bookings/:id/cancel', protect, cancelBooking);
+router.post('/bookings/:id/reassign', protect, requestReassignment);
 router.post('/bookings/:id/confirm', protect, confirmCompletion);
 
 // Payments

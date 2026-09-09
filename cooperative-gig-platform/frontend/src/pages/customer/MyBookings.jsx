@@ -23,11 +23,13 @@ export default function MyBookings() {
 
   const statusColors = {
     REQUESTED: 'badge-gray', MATCHING: 'badge-info', ASSIGNED: 'badge-info',
-    ACCEPTED: 'badge-success', ON_THE_WAY: 'badge-success', STARTED: 'badge-success',
+    REASSIGNED: 'badge-warning', ACCEPTED: 'badge-success', ON_THE_WAY: 'badge-success',
+    WORKER_ARRIVED: 'badge-success', STARTED: 'badge-success', IN_PROGRESS: 'badge-success',
     COMPLETED: 'badge-success', CANCELLED: 'badge-danger', DISPUTED: 'badge-warning',
+    WORKER_NO_SHOW: 'badge-danger', EXPIRED: 'badge-danger',
   };
 
-  const filters = ['', 'REQUESTED', 'MATCHING', 'ACCEPTED', 'STARTED', 'COMPLETED', 'CANCELLED', 'DISPUTED'];
+  const filters = ['', 'REQUESTED', 'MATCHING', 'REASSIGNED', 'ACCEPTED', 'STARTED', 'COMPLETED', 'CANCELLED', 'DISPUTED', 'WORKER_NO_SHOW', 'EXPIRED'];
 
   return (
     <div className="space-y-6">

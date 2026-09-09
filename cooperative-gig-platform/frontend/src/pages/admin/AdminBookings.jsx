@@ -24,8 +24,10 @@ export default function AdminBookings() {
 
   const statusColors = {
     REQUESTED: 'badge-gray', MATCHING: 'badge-info', ASSIGNED: 'badge-info',
-    ACCEPTED: 'badge-success', ON_THE_WAY: 'badge-success', STARTED: 'badge-success',
+    REASSIGNED: 'badge-warning', ACCEPTED: 'badge-success', ON_THE_WAY: 'badge-success',
+    WORKER_ARRIVED: 'badge-success', STARTED: 'badge-success', IN_PROGRESS: 'badge-success',
     COMPLETED: 'badge-success', CANCELLED: 'badge-danger', DISPUTED: 'badge-warning',
+    WORKER_NO_SHOW: 'badge-danger', EXPIRED: 'badge-danger',
   };
 
   return (
@@ -33,7 +35,7 @@ export default function AdminBookings() {
       <h2 className="text-xl font-bold text-gray-900">All Bookings</h2>
 
       <div className="flex flex-wrap gap-2">
-        {['', 'REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED', 'COMPLETED', 'CANCELLED', 'DISPUTED'].map((s) => (
+        {['', 'REQUESTED', 'MATCHING', 'ASSIGNED', 'REASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'DISPUTED', 'WORKER_NO_SHOW', 'EXPIRED'].map((s) => (
           <button key={s} onClick={() => { setFilter(s); setPage(1); }}
             className={`px-3 py-1.5 rounded-full text-xs font-medium ${filter === s ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             {s || 'All'}

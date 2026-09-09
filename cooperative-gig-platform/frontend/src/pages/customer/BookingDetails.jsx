@@ -6,7 +6,7 @@ import { getSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
 import { COMPLAINT_CATEGORIES, PREFERRED_RESOLUTIONS } from '../../utils/complaints';
 
-const TRACKING_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'STARTED'];
+const TRACKING_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
 
 const haversineKm = (coords, coords2) => {
   const [lng1, lat1] = coords;
@@ -114,6 +114,20 @@ export default function BookingDetails() {
     }
   };
 
+  const handleReassign = async () => {
+    try {
+      const res = await api.post(`/customers/bookings/${id}/reassign`);
+      if (res.success) {
+        toast.success('Looking for a replacement worker…');
+      } else {
+        toast.error(res.message || 'No replacement worker available right now');
+      }
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
   const handleReview = async (quality) => {
     try {
       await api.post('/reviews', {
@@ -170,9 +184,12 @@ export default function BookingDetails() {
   const statusColors = {
     REQUESTED: 'bg-gray-100 text-gray-700', MATCHING: 'bg-blue-100 text-blue-700',
     ASSIGNED: 'bg-blue-100 text-blue-700', ACCEPTED: 'bg-green-100 text-green-700',
-    ON_THE_WAY: 'bg-green-100 text-green-700', STARTED: 'bg-green-100 text-green-700',
+    ON_THE_WAY: 'bg-green-100 text-green-700', WORKER_ARRIVED: 'bg-green-100 text-green-700',
+    STARTED: 'bg-green-100 text-green-700', IN_PROGRESS: 'bg-green-100 text-green-700',
     COMPLETED: 'bg-green-100 text-green-700', CANCELLED: 'bg-red-100 text-red-700',
     DISPUTED: 'bg-yellow-100 text-yellow-700',
+    WORKER_NO_SHOW: 'bg-red-100 text-red-700', EXPIRED: 'bg-red-100 text-red-700',
+    REASSIGNED: 'bg-yellow-100 text-yellow-700',
   };
 
   return (
@@ -214,6 +231,45 @@ export default function BookingDetails() {
           </div>
         )}
       </div>
+
+      {/* No-show / reassignment / expiry banner */}
+      {['WORKER_NO_SHOW', 'REASSIGNED', 'EXPIRED'].includes(booking.status) && (
+        <div className="card border-red-200 bg-red-50/50">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🙁</span>
+            <div className="flex-1">
+              <h4 className="font-semibold text-red-700">
+                {booking.status === 'WORKER_NO_SHOW'
+                  ? 'The assigned worker did not arrive'
+                  : booking.status === 'REASSIGNED'
+                  ? 'The assigned worker did not arrive — finding a replacement'
+                  : 'This booking expired'}
+              </h4>
+              <p className="text-sm text-gray-600 mt-1">
+                Unfortunately, the assigned worker did not arrive for your job. Please choose how you&apos;d like to proceed:
+              </p>
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button onClick={handleReassign} className="btn-primary text-sm">
+                  🔄 Find Another Worker
+                </button>
+                <button onClick={handleCancel} className="btn-danger text-sm">
+                  ✕ Cancel &amp; Request Refund
+                </button>
+                <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">
+                  📞 Contact Support
+                </button>
+                {(booking.failedJobReason || booking.noShowDetectedAt) && (
+                  <span className="text-xs text-gray-400 self-center">
+                    {booking.noShowDetectedAt
+                      ? `No-show detected ${new Date(booking.noShowDetectedAt).toLocaleString()}`
+                      : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Worker */}
       {booking.worker && (
@@ -267,10 +323,12 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Candidate workers (during matching) */}
-      {booking.status === 'MATCHING' && booking.candidateWorkers?.length > 0 && (
+      {/* Candidate workers (during matching / reassignment) */}
+      {['MATCHING', 'REASSIGNED'].includes(booking.status) && booking.candidateWorkers?.length > 0 && (
         <div className="card">
-          <h4 className="font-semibold mb-2">Matched Workers (awaiting acceptance)</h4>
+          <h4 className="font-semibold mb-2">
+            {booking.status === 'REASSIGNED' ? 'Replacement Workers (awaiting acceptance)' : 'Matched Workers (awaiting acceptance)'}
+          </h4>
           <div className="space-y-2">
             {booking.candidateWorkers.map((c, i) => (
               <div key={i} className="p-2 bg-gray-50 rounded-lg text-sm">

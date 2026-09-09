@@ -17,7 +17,7 @@ const getDashboard = asyncHandler(async (req, res) => {
   const [upcomingBooking, activeJob, previousJobs, allJobs] = await Promise.all([
     Booking.findOne({
       customer: customerId,
-      status: { $in: ['MATCHING', 'ASSIGNED', 'ACCEPTED'] },
+      status: { $in: ['MATCHING', 'REASSIGNED', 'ASSIGNED', 'ACCEPTED'] },
       requestedDate: { $gte: now },
     })
       .populate('service', 'name category icon')
@@ -25,7 +25,7 @@ const getDashboard = asyncHandler(async (req, res) => {
 
     Booking.findOne({
       customer: customerId,
-      status: { $in: ['ON_THE_WAY', 'STARTED'] },
+      status: { $in: ['ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'] },
     })
       .populate('service', 'name category icon')
       .populate('worker', 'rating')

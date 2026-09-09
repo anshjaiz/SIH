@@ -89,6 +89,21 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: 'Flexible',
     },
+    // Derived/structured schedule window used by the reliability scheduler.
+    // Start/End are absolute instants derived from requestedDate + timeSlot
+    // (or explicit customer-start/end times) at booking creation.
+    scheduledDate: {
+      type: Date,
+      index: true,
+    },
+    scheduledStartTime: {
+      type: Date,
+      index: true,
+    },
+    scheduledEndTime: {
+      type: Date,
+      index: true,
+    },
     isEmergency: {
       type: Boolean,
       default: false,
@@ -106,10 +121,15 @@ const bookingSchema = new mongoose.Schema(
         'ASSIGNED',
         'ACCEPTED',
         'ON_THE_WAY',
+        'WORKER_ARRIVED',
         'STARTED',
+        'IN_PROGRESS',
         'COMPLETED',
         'CANCELLED',
         'DISPUTED',
+        'WORKER_NO_SHOW',
+        'EXPIRED',
+        'REASSIGNED',
       ],
       default: 'REQUESTED',
       index: true,
@@ -162,6 +182,20 @@ const bookingSchema = new mongoose.Schema(
       coordinates: [Number],
       lastUpdatedAt: Date,
     },
+    // Reliability / no-show lifecycle
+    acceptedAt: Date,
+    workerCheckInAt: Date,
+    noShowDetectedAt: Date,
+    expiredAt: Date,
+    reassignmentAttempts: {
+      type: Number,
+      default: 0,
+    },
+    reassignedAt: Date,
+    remindersSent: {
+      type: [Date],
+      default: [],
+    },
     // Confirmation
     customerConfirmed: {
       type: Boolean,
@@ -193,6 +227,8 @@ const bookingSchema = new mongoose.Schema(
 // Indexes for queries
 bookingSchema.index({ location: '2dsphere' });
 bookingSchema.index({ status: 1, requestedDate: 1 });
+bookingSchema.index({ status: 1, scheduledStartTime: 1 });
+bookingSchema.index({ status: 1, scheduledEndTime: 1 });
 bookingSchema.index({ customer: 1, status: 1 });
 bookingSchema.index({ worker: 1, status: 1 });
 bookingSchema.index({ isEmergency: 1, status: 1 });

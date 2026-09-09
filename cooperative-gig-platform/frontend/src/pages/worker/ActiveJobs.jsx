@@ -85,7 +85,7 @@ export default function ActiveJobs() {
 
   // Live location sharing: while an active job is ON_THE_WAY or STARTED,
   // send the worker's location every 10s so the customer can track them.
-  const trackingJob = jobs.some((j) => ['ON_THE_WAY', 'STARTED'].includes(j.status));
+  const trackingJob = jobs.some((j) => ['ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(j.status));
   useEffect(() => {
     if (!trackingJob) return;
     const send = () => {
@@ -123,17 +123,30 @@ export default function ActiveJobs() {
     }
   };
 
+  const handleArrive = async (id) => {
+    try {
+      await api.post(`/workers/jobs/${id}/arrive`);
+      toast.success('Arrival recorded');
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
   const statusFlow = {
     ASSIGNED: 'ACCEPTED',
     ACCEPTED: 'ON_THE_WAY',
     ON_THE_WAY: 'STARTED',
+    WORKER_ARRIVED: 'STARTED',
   };
 
   const statusColors = {
     ASSIGNED: 'bg-blue-100 text-blue-700',
     ACCEPTED: 'bg-green-100 text-green-700',
     ON_THE_WAY: 'bg-green-100 text-green-700',
+    WORKER_ARRIVED: 'bg-green-100 text-green-700',
     STARTED: 'bg-green-100 text-green-700',
+    IN_PROGRESS: 'bg-green-100 text-green-700',
   };
 
   return (
@@ -154,7 +167,7 @@ export default function ActiveJobs() {
                   <p className="text-sm text-gray-500">{job.bookingNumber}</p>
                 </div>
                 <span className={`badge px-3 py-1 ${statusColors[job.status]}`}>{job.status}</span>
-                {['ON_THE_WAY', 'STARTED'].includes(job.status) && (
+                {['ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) && (
                   <span className="badge px-3 py-1 bg-red-100 text-red-700">● Live location ON</span>
                 )}
               </div>
@@ -175,20 +188,28 @@ export default function ActiveJobs() {
               )}
 
               <div className="flex gap-3">
-                {statusFlow[job.status] && (
-                  <button
-                    onClick={() => handleStatus(job._id, statusFlow[job.status])}
-                    className="btn-primary flex-1"
-                  >
-                    {job.status === 'ACCEPTED' ? '🚗 Start Navigation (On The Way)' :
-                     job.status === 'ON_THE_WAY' ? '🔧 Start Work' :
-                     '✅ Accept'}
-                  </button>
-                )}
-                {job.status === 'STARTED' && (
-                  <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ Complete Job</button>
-                )}
-              </div>
+                  {job.status === 'ASSIGNED' && (
+                    <button onClick={() => handleStatus(job._id, 'ACCEPTED')} className="btn-primary flex-1">✅ Accept</button>
+                  )}
+                  {job.status === 'ACCEPTED' && (
+                    <>
+                      <button onClick={() => handleStatus(job._id, 'ON_THE_WAY')} className="btn-primary flex-1">🚗 Start Navigation (On The Way)</button>
+                      <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 I've Arrived</button>
+                    </>
+                  )}
+                  {job.status === 'ON_THE_WAY' && (
+                    <>
+                      <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 I've Arrived</button>
+                      <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 Start Work</button>
+                    </>
+                  )}
+                  {job.status === 'WORKER_ARRIVED' && (
+                    <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 Start Work</button>
+                  )}
+                  {['STARTED', 'IN_PROGRESS'].includes(job.status) && (
+                    <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ Complete Job</button>
+                  )}
+                </div>
 
               {/* Price */}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
@@ -200,7 +221,7 @@ export default function ActiveJobs() {
               </div>
 
               {/* Collaboration */}
-              {(teams[job._id] !== undefined || ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'].includes(job.status)) && (
+              {(teams[job._id] !== undefined || ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status)) && (
                 <div className="mt-4">
                   {teams[job._id] ? (
                     <JobTeamCard team={teams[job._id]} helperLocs={helperLocs} bookingLocation={job.location?.coordinates} />

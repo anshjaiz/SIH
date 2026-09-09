@@ -145,7 +145,7 @@ const workloadScore = async (worker, now = new Date()) => {
   const workerJobsThisWeek = await Booking.countDocuments({
     worker: worker._id,
     createdAt: { $gte: startOfWeek },
-    status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED', 'COMPLETED'] },
+    status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'COMPLETED'] },
   });
 
   // Compute distribution across all similar workers to normalize
@@ -163,7 +163,7 @@ const workloadScore = async (worker, now = new Date()) => {
       $match: {
         worker: { $in: workerIds },
         createdAt: { $gte: startOfWeek },
-        status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED', 'COMPLETED'] },
+        status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'COMPLETED'] },
       },
     },
     { $group: { _id: '$worker', count: { $sum: 1 } } },
@@ -319,6 +319,8 @@ const matchWorkersForBooking = async (bookingData, limit = 5) => {
   const candidateWorkers = await Worker.find({
     isActive: true,
     verificationStatus: 'VERIFIED',
+    // Do not match merit-suspended / under-review workers
+    accountStatus: { $nin: ['TEMPORARILY_SUSPENDED', 'DEACTIVATION_REVIEW'] },
     ...(skillFilter ? skillFilter : {}),
     location: {
       $near: {
@@ -368,7 +370,9 @@ const refreshWorkerEligibility = async (workerId) => {
   if (!worker) return { reassessed: 0, added: [], removed: [] };
 
   const isProfileEligible =
-    worker.isActive && worker.verificationStatus === 'VERIFIED';
+    worker.isActive &&
+    worker.verificationStatus === 'VERIFIED' &&
+    !['TEMPORARILY_SUSPENDED', 'DEACTIVATION_REVIEW'].includes(worker.accountStatus);
 
   const openBookings = await Booking.find({ status: 'MATCHING' });
   const added = [];

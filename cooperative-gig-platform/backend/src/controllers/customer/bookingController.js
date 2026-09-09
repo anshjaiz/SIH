@@ -8,6 +8,7 @@ const Payment = require('../../models/Payment');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const { matchWorkersForBooking } = require('../../services/matching/matchingService');
 const { computePriceBreakdown } = require('../../utils/pricingUtils');
+const { deriveScheduleWindow } = require('../../utils/scheduleUtils');
 const Cooperative = require('../../models/Cooperative');
 const { getIO } = require('../../config/socket');
 
@@ -22,6 +23,8 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     city,
     requestedDate,
     timeSlot,
+    startTime,
+    endTime,
     isEmergency,
     emergencyType,
     materialsEstimate = 0,
@@ -43,6 +46,13 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     materialsEstimate,
     coop
   );
+
+  // Absolute schedule window used by the reliability scheduler
+  const schedule = deriveScheduleWindow(requestedDate, timeSlot, {
+    isEmergency,
+    explicitStartTime: startTime,
+    explicitEndTime: endTime,
+  });
 
   // Create booking with REQUESTED status
   const booking = await Booking.create({
@@ -67,6 +77,9 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     city,
     requestedDate: new Date(requestedDate),
     timeSlot,
+    scheduledDate: schedule.scheduledDate,
+    scheduledStartTime: schedule.scheduledStartTime,
+    scheduledEndTime: schedule.scheduledEndTime,
     isEmergency,
     emergencyType,
     priceBreakdown,
@@ -234,6 +247,10 @@ const cancelBooking = asyncHandler(async (req, res) => {
     throw new ApiError(`Cannot cancel booking in ${booking.status} status`, 400);
   }
 
+  const workerHadAccepted =
+    booking.acceptedAt &&
+    ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(booking.status);
+
   booking.status = 'CANCELLED';
   booking.cancelledBy = req.user.role === 'admin' ? 'admin' : 'customer';
   booking.cancellationReason = req.body.reason || 'Cancelled by customer';
@@ -245,11 +262,63 @@ const cancelBooking = asyncHandler(async (req, res) => {
   });
   await booking.save();
 
+  // Reliability: cancelling after a worker accepted unfairly penalises the worker.
+  if (workerHadAccepted && booking.worker) {
+    require('../../services/reliability/reliabilityService')
+      .handleCancelledAfterAccept(booking.worker, booking._id)
+      .catch((e) => console.error('[reliability] cancel penalty error:', e.message));
+  }
+
+  if (booking.worker && workerHadAccepted) {
+    const workerUser = await Worker.findById(booking.worker).select('user');
+    if (workerUser) {
+      await Notification.create({
+        user: workerUser.user,
+        type: 'BOOKING_CREATED',
+        title: 'Booking cancelled by customer',
+        message: `The customer cancelled ${booking.bookingNumber} after you accepted it.`,
+        data: { bookingId: booking._id, bookingNumber: booking.bookingNumber },
+      });
+    }
+  }
+
   res.json({ success: true, message: 'Booking cancelled', data: booking });
+});
+
+// Request a replacement worker after a no-show / worker failure
+const requestReassignment = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError('Booking not found', 404);
+
+  const isOwner = booking.customer.toString() === req.user._id.toString();
+  if (!isOwner && req.user.role !== 'admin') {
+    throw new ApiError('Not authorized', 403);
+  }
+
+  if (!['WORKER_NO_SHOW', 'REASSIGNED', 'EXPIRED'].includes(booking.status)) {
+    throw new ApiError(`Cannot request a replacement in ${booking.status} status`, 400);
+  }
+
+  const { attemptReassignment } = require('../../services/reliability/reliabilityService');
+  const result = await attemptReassignment(booking, { reason: 'CUSTOMER_REQUEST' });
+
+  if (result.reassigned) {
+    return res.json({
+      success: true,
+      message: 'Looking for a replacement worker',
+      data: { status: 'REASSIGNED', candidateCount: result.candidateCount },
+    });
+  }
+  return res.json({
+    success: false,
+    message: 'No replacement worker available right now. Please try later or contact support.',
+    data: { status: 'EXPIRED' },
+  });
 });
 
 module.exports = {
   createServiceRequest,
   getBookingById,
   cancelBooking,
+  requestReassignment,
 };

@@ -205,6 +205,12 @@ const respondCollaborationRequest = asyncHandler(async (req, res) => {
     const team = await teamFormationService.getTeamForRequest(request._id);
     notifyLeadWorker(result.request, `${req.user.name} accepted the ${request.role} collaboration!`, team);
     notifyAcceptedConfirmation(workerId, { requestId: request._id, role: request.role, status: 'ACCEPTED' });
+    // Reliability merit: collaboration participation earns the helper points.
+    if (request.booking) {
+      require('../../services/reliability/reliabilityService')
+        .handleCollaboration(workerId, request.booking)
+        .catch((e) => console.error('[reliability] collaboration bonus error:', e.message));
+    }
     res.json({ success: true, message: result.full ? 'Team is now full!' : 'Collaboration accepted. See you on the job!', data: { request: result.request, team } });
   } else {
     result = await teamFormationService.declineCollaborator(request._id, workerId);

@@ -9,6 +9,14 @@ const syncWorkerLocation = require('../../utils/syncWorkerLocation');
 const { getIO } = require('../../config/socket');
 const { computeWorkerEarnings } = require('../../utils/pricingUtils');
 const Cooperative = require('../../models/Cooperative');
+const {
+  recordCheckIn,
+  handleLateArrival,
+  handleJobCompleted,
+  isWorkerTakeableForJobs,
+} = require('../../services/reliability/reliabilityService');
+const { getSettings } = require('../../services/reliability/reliabilityConfig');
+const { resolveScheduleTimes } = require('../../utils/scheduleUtils');
 
 // Helper to get worker profile for current user
 const getWorkerId = async (userId) => {
@@ -35,7 +43,7 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
     // Active/ongoing jobs
     Booking.find({
       worker: workerId,
-      status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'] },
+      status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'] },
     })
       .populate('service', 'name category')
       .populate('customer', 'name phone avatar')
@@ -44,7 +52,7 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
     // Jobs awaiting accept
     Booking.find({
       'candidateWorkers.worker': workerId,
-      status: 'MATCHING',
+      status: { $in: ['MATCHING', 'REASSIGNED'] },
     })
       .populate('service', 'name category')
       .populate('customer', 'name')
@@ -107,14 +115,14 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
   });
 });
 
-// Get job requests (MATCHING)
+// Get job requests (MATCHING / REASSIGNED)
 const getJobRequests = asyncHandler(async (req, res) => {
   const worker = await Worker.findOne({ user: req.user._id });
   if (!worker) throw new ApiError('Worker profile not found', 404);
 
   const requests = await Booking.find({
     'candidateWorkers.worker': worker._id,
-    status: 'MATCHING',
+    status: { $in: ['MATCHING', 'REASSIGNED'] },
   })
     .populate('service', 'name category basePrice')
     .populate('customer', 'name phone avatar')
@@ -140,6 +148,14 @@ const acceptJob = asyncHandler(async (req, res) => {
   if (!worker) throw new ApiError('Worker profile not found', 404);
   const workerId = worker._id;
 
+  // Merit suspension gate: suspended / deactivation-review workers cannot earn.
+  if (!isWorkerTakeableForJobs(worker)) {
+    throw new ApiError(
+      'Your reliability status blocks you from accepting jobs. Contact admin support.',
+      403
+    );
+  }
+
   const booking = await Booking.findById(req.params.id);
   if (!booking) throw new ApiError('Booking not found', 404);
 
@@ -147,12 +163,13 @@ const acceptJob = asyncHandler(async (req, res) => {
     throw new ApiError('This job was not offered to you', 403);
   }
 
-  if (booking.status !== 'MATCHING' && booking.status !== 'ASSIGNED') {
+  if (!['MATCHING', 'ASSIGNED', 'REASSIGNED'].includes(booking.status)) {
     throw new ApiError(`Cannot accept job in ${booking.status} status`, 400);
   }
 
   booking.worker = workerId;
   booking.status = 'ACCEPTED';
+  booking.acceptedAt = new Date();
   booking.matchedScore = booking.candidateWorkers.find(
     (c) => c.worker.toString() === workerId.toString()
   )?.score || 0;
@@ -163,7 +180,9 @@ const acceptJob = asyncHandler(async (req, res) => {
     status: 'ACCEPTED',
     updatedAt: new Date(),
     updatedBy: req.user._id,
-    note: 'Worker accepted the job',
+    note: booking.reassignedAt
+      ? 'Replacement worker accepted the job'
+      : 'Worker accepted the job',
   });
   await booking.save();
 
@@ -199,6 +218,47 @@ const rejectJob = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Job rejected' });
 });
 
+// Job history (completed + failed/no-show/expired/reassigned) for the worker
+const getJobHistory = asyncHandler(async (req, res) => {
+  const worker = await Worker.findOne({ user: req.user._id });
+  if (!worker) throw new ApiError('Worker profile not found', 404);
+
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const tab = req.query.tab; // 'completed' | 'failed' | undefined (all)
+
+  const statusFilter =
+    tab === 'completed'
+      ? { $in: ['COMPLETED'] }
+      : tab === 'failed'
+      ? { $in: ['WORKER_NO_SHOW', 'EXPIRED', 'REASSIGNED', 'CANCELLED'] }
+      : { $in: ['COMPLETED', 'WORKER_NO_SHOW', 'EXPIRED', 'REASSIGNED', 'CANCELLED'] };
+
+  const [jobs, total] = await Promise.all([
+    Booking.find({
+      worker: worker._id,
+      status: statusFilter,
+    })
+      .populate('service', 'name category')
+      .populate('customer', 'name phone avatar')
+      .sort({ updatedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Booking.countDocuments({
+      worker: worker._id,
+      status: statusFilter,
+    }),
+  ]);
+
+  res.json({
+    success: true,
+    data: {
+      jobs,
+      meta: { total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) },
+    },
+  });
+});
+
 // Get active jobs
 const getActiveJobs = asyncHandler(async (req, res) => {
   const worker = await Worker.findOne({ user: req.user._id });
@@ -206,7 +266,7 @@ const getActiveJobs = asyncHandler(async (req, res) => {
 
   const jobs = await Booking.find({
     worker: worker._id,
-    status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'] },
+    status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'] },
   })
     .populate('service', 'name category')
     .populate('customer', 'name phone avatar')
@@ -225,9 +285,14 @@ const startJob = asyncHandler(async (req, res) => {
   if (booking.worker.toString() !== worker._id.toString()) {
     throw new ApiError('Not your job', 403);
   }
-  if (booking.status !== 'ACCEPTED' && booking.status !== 'ON_THE_WAY') {
+  if (booking.status !== 'ACCEPTED' && booking.status !== 'ON_THE_WAY' && booking.status !== 'WORKER_ARRIVED') {
     throw new ApiError(`Cannot start job in ${booking.status} status`, 400);
   }
+
+  // Explicit check-in: only the Start button (not app open) records arrival.
+  await recordCheckIn(booking, worker, {
+    coordinates: req.body && req.body.coordinates,
+  });
 
   booking.status = 'STARTED';
   booking.statusHistory.push({
@@ -239,6 +304,67 @@ const startJob = asyncHandler(async (req, res) => {
   await booking.save();
 
   res.json({ success: true, message: 'Job started', data: booking });
+});
+
+// Worker marks themself as arrived at the customer location (explicit check-in)
+const arriveBooking = asyncHandler(async (req, res) => {
+  const worker = await Worker.findOne({ user: req.user._id });
+  if (!worker) throw new ApiError('Worker profile not found', 404);
+
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError('Booking not found', 404);
+  if (booking.worker.toString() !== worker._id.toString()) {
+    throw new ApiError('Not your job', 403);
+  }
+  if (!['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED'].includes(booking.status)) {
+    throw new ApiError(`Cannot mark arrival in ${booking.status} status`, 400);
+  }
+
+  const coordinates =
+    req.body && (req.body.coordinates || (req.body.location && req.body.location.coordinates));
+
+  const { checkedInAt } = await recordCheckIn(booking, worker, { coordinates });
+
+  if (booking.status !== 'WORKER_ARRIVED') {
+    booking.status = 'WORKER_ARRIVED';
+    booking.statusHistory.push({
+      status: 'WORKER_ARRIVED',
+      updatedAt: new Date(),
+      updatedBy: req.user._id,
+      note: 'Worker arrived at location',
+    });
+    await booking.save();
+  }
+
+  // Late-arrival penalty: arrived past start + tolerance, but before the
+  // no-show deadline (else the scheduler marks it as no-show instead).
+  const latestBooking = await Booking.findById(booking._id);
+  if (latestBooking) {
+    const { scheduledStartTime, scheduledEndTime } = resolveScheduleTimes(latestBooking);
+    if (scheduledStartTime && scheduledEndTime) {
+      const settings = await getSettings();
+      const toleranceCutoff = new Date(
+        scheduledStartTime.getTime() + settings.lateToleranceMinutes * 60000
+      );
+      const deadline = new Date(
+        scheduledEndTime.getTime() + settings.noShowGraceMinutes * 60000
+      );
+      if (checkedInAt && checkedInAt > toleranceCutoff && checkedInAt <= deadline) {
+        const minutesLate = Math.max(
+          1,
+          Math.round((checkedInAt.getTime() - scheduledStartTime.getTime()) / 60000)
+        );
+        await handleLateArrival(worker._id, latestBooking._id, { minutes: minutesLate }).catch(
+          (e) => console.error('[reliability] late arrival error:', e.message)
+        );
+      }
+    }
+  }
+
+  const io = getIO();
+  if (io) io.to(`customer_${booking.customer}`).emit('booking_update', { bookingId: booking._id, status: 'WORKER_ARRIVED' });
+
+  res.json({ success: true, message: 'Arrival recorded', data: { checkedInAt } });
 });
 
 // Update worker location (for tracking)
@@ -272,7 +398,7 @@ const completeJob = asyncHandler(async (req, res) => {
   if (booking.worker.toString() !== worker._id.toString()) {
     throw new ApiError('Not your job', 403);
   }
-  if (booking.status !== 'STARTED') {
+  if (booking.status !== 'STARTED' && booking.status !== 'WORKER_ARRIVED' && booking.status !== 'IN_PROGRESS') {
     throw new ApiError(`Cannot complete job in ${booking.status} status`, 400);
   }
 
@@ -290,6 +416,16 @@ const completeJob = asyncHandler(async (req, res) => {
   // Update worker stats
   worker.completedJobs = (worker.completedJobs || 0) + 1;
   await worker.save();
+
+  // Reliability merit points: +completeJob, and +onTime when finished by the
+  // effective end time (legacy bookings derive their window from the slot).
+  const { scheduledEndTime: effectiveEndTime } = resolveScheduleTimes(booking);
+  const onTime = effectiveEndTime ? booking.completedAt <= effectiveEndTime : true;
+  try {
+    await handleJobCompleted(booking, worker, { onTime });
+  } catch (e) {
+    console.error('[reliability] completion bonus error:', e.message);
+  }
 
   // Finalize collaboration team (credits collaborators)
   const { completeTeam } = require('../../services/collaborator/teamFormationService');
@@ -390,12 +526,19 @@ const updateJobStatus = asyncHandler(async (req, res) => {
   const allowed = {
     ASSIGNED: 'ACCEPTED',
     ACCEPTED: 'ON_THE_WAY',
-    ON_THE_WAY: 'STARTED',
-    STARTED: 'STARTED',
+    ON_THE_WAY: 'WORKER_ARRIVED',
+    WORKER_ARRIVED: 'IN_PROGRESS',
+    STARTED: 'IN_PROGRESS',
+    IN_PROGRESS: 'IN_PROGRESS',
   };
 
   if (!allowed[booking.status] || allowed[booking.status] !== status) {
     throw new ApiError(`Cannot transition from ${booking.status} to ${status}`, 400);
+  }
+
+  // Arrival / work started = explicit check-in.
+  if (['WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(status)) {
+    await recordCheckIn(booking, worker);
   }
 
   booking.status = status;
@@ -417,8 +560,10 @@ module.exports = {
   rejectJob,
   getActiveJobs,
   startJob,
+  arriveBooking,
   updateLocation,
   completeJob,
+  getJobHistory,
   confirmCompletion,
   getEarnings,
   getWorkerReviews,

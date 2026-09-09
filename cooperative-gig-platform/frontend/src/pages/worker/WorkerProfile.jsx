@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 export default function WorkerProfile() {
   const [profile, setProfile] = useState(null);
+  const [reliability, setReliability] = useState(null);
   const [loading, setLoading] = useState(true);
   const [allSkills, setAllSkills] = useState([]);
   const [newSkillId, setNewSkillId] = useState('');
@@ -27,6 +28,9 @@ export default function WorkerProfile() {
         });
         const skillsRes = await api.get('/services/skills/list');
         setAllSkills(skillsRes.data || []);
+        api.get('/workers/me/reliability')
+          .then((r) => setReliability(r.data || null))
+          .catch(() => setReliability(null));
       } catch (e) {
         console.error(e);
       }
@@ -110,6 +114,72 @@ export default function WorkerProfile() {
         </p>
         <p className="text-sm text-gray-600 mt-1">Profile completeness affects your matching score</p>
       </div>
+
+      {/* Reliability / Merit card */}
+      {reliability && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="font-semibold">Reliability Score</h3>
+              <p className="text-xs text-gray-500">
+                {reliability.reliability?.score >= 80
+                  ? 'Good standing — keep it up!'
+                  : reliability.reliability?.score >= 60
+                  ? 'Watch out — complete jobs on time to recover points.'
+                  : reliability.reliability?.score >= 40
+                  ? 'Low reliability — frequent failures may limit new jobs.'
+                  : 'You are currently suspended from accepting new jobs. Appeal penalties or contact admin.'}
+              </p>
+            </div>
+            <div className="text-right">
+              <span className={`text-3xl font-black ${
+                reliability.reliability?.score >= 80 ? 'text-green-600'
+                : reliability.reliability?.score >= 60 ? 'text-yellow-600'
+                : reliability.reliability?.score >= 40 ? 'text-orange-600'
+                : 'text-red-600'
+              }`}>{reliability.reliability?.score}</span>
+              <span className="text-gray-400">/100</span>
+            </div>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2.5 mb-3">
+            <div
+              className={`h-2.5 rounded-full ${
+                reliability.reliability?.score >= 80 ? 'bg-green-500'
+                : reliability.reliability?.score >= 60 ? 'bg-yellow-500'
+                : reliability.reliability?.score >= 40 ? 'bg-orange-500'
+                : 'bg-red-500'
+              }`}
+              style={{ width: `${reliability.reliability?.score || 0}%` }}
+            ></div>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="badge badge-info">Level: {reliability.reliability?.level}</span>
+            <span className={`badge ${
+              ['TEMPORARILY_SUSPENDED', 'DEACTIVATION_REVIEW'].includes(reliability.reliability?.level)
+                ? 'badge-danger'
+                : reliability.reliability?.level === 'WARNING'
+                ? 'badge-warning'
+                : 'badge-success'
+            }`}>Status: {reliability.reliability?.level?.replace(/_/g, ' ')}</span>
+            <span className="badge badge-gray">✅ {reliability.reliability?.completedCount || 0} completed</span>
+            <span className="badge badge-gray">⏱ {reliability.reliability?.onTimeCount || 0} on-time</span>
+            <span className="badge badge-gray">🚫 {reliability.reliability?.noShowCount || 0} no-shows</span>
+            <span className="badge badge-gray">⏰ {reliability.reliability?.lateCount || 0} late</span>
+          </div>
+          {reliability.recentEvents?.length > 0 && (
+            <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
+              {reliability.recentEvents.map((ev) => (
+                <div key={ev._id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
+                  <span className="text-gray-600">{ev.eventType} — {ev.reason}</span>
+                  <span className={`font-medium ${ev.points >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {ev.points >= 0 ? '+' : ''}{ev.points} ({ev.previousScore} → {ev.newScore})
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Basic Info */}
       <form onSubmit={handleUpdate} className="card space-y-4">

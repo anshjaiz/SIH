@@ -157,8 +157,24 @@ const workerProfileSchema = new mongoose.Schema(
     },
     reliability: {
       type: Number,
-      default: 0, // percent 0-100
+      default: 100, // percent 0-100
       max: 100,
+      min: 0,
+    },
+    // Reliability lifecycle status driven by the merit score. This is SEPARATE
+    // from administrative suspension (isActive / suspensionUntil) which is
+    // handled by complaintService. Low-reliability states here only restrict
+    // earning (job acceptance, matching) — see reliabilityService / workerStatus.
+    accountStatus: {
+      type: String,
+      enum: [
+        'ACTIVE',
+        'WARNING',
+        'LOW_RELIABILITY',
+        'TEMPORARILY_SUSPENDED',
+        'DEACTIVATION_REVIEW',
+      ],
+      default: 'ACTIVE',
     },
     // Welfare status
     insuranceActive: {
@@ -203,6 +219,7 @@ workerProfileSchema.index({ location: '2dsphere' });
 workerProfileSchema.index({ 'skills.skill': 1 });
 workerProfileSchema.index({ 'skills.verified': 1 });
 workerProfileSchema.index({ verificationStatus: 1 });
+workerProfileSchema.index({ accountStatus: 1 });
 workerProfileSchema.index({ city: 1 });
 
 module.exports = mongoose.model('Worker', workerProfileSchema);

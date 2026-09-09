@@ -21,7 +21,7 @@ const { createNotification, notifyUsers } = require('../notification/notificatio
 
 const { ApiError } = require('../../middleware/errorMiddleware');
 
-const ACTIVE_BOOKING_STATUSES = ['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'];
+const ACTIVE_BOOKING_STATUSES = ['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
 
 // Categories that automatically elevate priority and are flagged as safety-related
 const SAFETY_CATEGORIES = new Map([

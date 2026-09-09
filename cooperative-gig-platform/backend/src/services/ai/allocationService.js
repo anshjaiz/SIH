@@ -22,7 +22,7 @@ const { haversineDistance } = require('../../utils/geoUtils');
  * Count worker's current active workload
  */
 const getWorkerWorkload = async (workerId) => {
-  const activeStatuses = ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'];
+  const activeStatuses = ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setHours(0, 0, 0, 0);

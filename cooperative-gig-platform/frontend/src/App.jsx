@@ -25,6 +25,7 @@ import WorkerDashboard from './pages/worker/WorkerDashboard';
 import WorkerProfile from './pages/worker/WorkerProfile';
 import JobRequests from './pages/worker/JobRequests';
 import ActiveJobs from './pages/worker/ActiveJobs';
+import JobHistory from './pages/worker/JobHistory';
 import Earnings from './pages/worker/Earnings';
 import Welfare from './pages/worker/Welfare';
 import Collaborations from './pages/worker/collaborator/Collaborations';
@@ -40,6 +41,7 @@ import AdminDemand from './pages/admin/AdminDemand';
 import AdminForecast from './pages/admin/AdminForecast';
 import AdminWelfare from './pages/admin/AdminWelfare';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminReliability from './pages/admin/AdminReliability';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
@@ -104,6 +106,7 @@ export default function App() {
             <Route path="profile" element={<WorkerProfile />} />
             <Route path="jobs" element={<JobRequests />} />
             <Route path="active" element={<ActiveJobs />} />
+            <Route path="history" element={<JobHistory />} />
             <Route path="earnings" element={<Earnings />} />
             <Route path="welfare" element={<Welfare />} />
             <Route path="collaborations" element={<Collaborations />} />
@@ -120,6 +123,7 @@ export default function App() {
             <Route path="demand" element={<AdminDemand />} />
             <Route path="forecast" element={<AdminForecast />} />
             <Route path="welfare" element={<AdminWelfare />} />
+            <Route path="reliability" element={<AdminReliability />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 

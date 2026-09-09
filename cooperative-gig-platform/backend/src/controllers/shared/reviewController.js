@@ -84,6 +84,12 @@ const createReview = asyncHandler(async (req, res) => {
         await worker.save();
       }
     }
+    // Reliability merit: a good rating adds points to the worker.
+    if (Number(ratings.overallQuality) >= 4 && booking.worker) {
+      require('../../services/reliability/reliabilityService')
+        .handleGoodRating(booking.worker, bookingId, Number(ratings.overallQuality))
+        .catch((e) => console.error('[reliability] rating bonus error:', e.message));
+    }
   }
 
   res.status(201).json({ success: true, message: 'Review submitted', data: review });

@@ -12,7 +12,7 @@ const { getIO } = require('../config/socket');
 const syncWorkerLocation = async (worker, coordinates) => {
   const activeBookings = await Booking.find({
     worker: worker._id,
-    status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'] },
+    status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'] },
   });
   await Promise.all(
     activeBookings.map((b) =>

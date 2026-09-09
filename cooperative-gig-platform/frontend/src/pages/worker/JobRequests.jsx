@@ -68,6 +68,7 @@ export default function JobRequests() {
                   <h3 className="font-semibold">{job.serviceSnapshot?.name}</h3>
                   <p className="text-sm text-gray-500">{job.bookingNumber} • {job.serviceSnapshot?.category}</p>
                   {job.isEmergency && <span className="badge bg-orange-100 text-orange-700 mt-1">⚡ EMERGENCY</span>}
+                  {job.status === 'REASSIGNED' && <span className="badge bg-purple-100 text-purple-700 mt-1">🔄 Replacement job — original worker no-showed</span>}
                   {job.requiredSkillNames?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className="text-xs text-gray-400">Required:</span>

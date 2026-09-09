@@ -6,7 +6,7 @@ import {
   HiOutlineHeart, HiOutlineChartBar, HiOutlineCog, HiOutlineLogout,
   HiOutlineBell, HiOutlineMenu, HiOutlineX, HiOutlineFire,
   HiOutlineExclamation, HiOutlineMap, HiOutlineClock,
-  HiOutlineClipboardList, HiOutlineUsers,
+  HiOutlineClipboardList, HiOutlineUsers, HiOutlineShieldCheck,
 } from 'react-icons/hi';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
 
@@ -27,6 +27,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/worker', icon: HiOutlineHome, label: 'Dashboard', end: true },
       { to: '/worker/jobs', icon: HiOutlineBriefcase, label: 'Job Requests' },
       { to: '/worker/active', icon: HiOutlineClock, label: 'Active Jobs' },
+      { to: '/worker/history', icon: HiOutlineClipboardList, label: 'Job History' },
       { to: '/worker/profile', icon: HiOutlineUser, label: 'My Profile' },
       { to: '/worker/earnings', icon: HiOutlineCurrencyRupee, label: 'Earnings' },
       { to: '/worker/collaborations', icon: HiOutlineUsers, label: 'Collaborations' },
@@ -41,6 +42,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/admin/analytics', icon: HiOutlineChartBar, label: 'Analytics' },
       { to: '/admin/demand', icon: HiOutlineMap, label: 'Demand Heatmap' },
       { to: '/admin/forecast', icon: HiOutlineFire, label: 'AI Forecasting' },
+      { to: '/admin/reliability', icon: HiOutlineShieldCheck, label: 'Reliability' },
       { to: '/admin/welfare', icon: HiOutlineHeart, label: 'Worker Welfare' },
       { to: '/admin/settings', icon: HiOutlineCog, label: 'Settings' },
     ],

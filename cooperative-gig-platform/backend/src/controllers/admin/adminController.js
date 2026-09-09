@@ -39,7 +39,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     Customer.countDocuments(),
     Booking.countDocuments({ createdAt: { $gte: startOfDay } }),
     Booking.countDocuments({ status: 'COMPLETED' }),
-    Booking.countDocuments({ status: { $in: ['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED'] } }),
+    Booking.countDocuments({ status: { $in: ['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'REASSIGNED'] } }),
     Payment.aggregate([
       { $match: { status: 'SUCCESS' } },
       { $group: { _id: null, revenue: { $sum: '$amount' }, count: { $sum: 1 } } },

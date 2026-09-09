@@ -17,13 +17,21 @@ const {
   rejectJob,
   getActiveJobs,
   startJob,
+  arriveBooking,
   updateLocation,
   completeJob,
   getEarnings,
   getWorkerReviews,
   updateJobStatus,
   confirmCompletion,
+  getJobHistory,
 } = require('../controllers/worker/workerJobsController');
+const {
+  getMyReliability,
+  getMyReliabilityHistory,
+  submitAppeal,
+  getMyAppeals,
+} = require('../controllers/reliability/workerReliabilityController');
 const {
   getWelfare,
   updateWelfare,
@@ -57,12 +65,20 @@ router.post('/availability', protect, setAvailability);
 // Jobs
 router.get('/jobs/requests', protect, getJobRequests);
 router.get('/jobs/active', protect, getActiveJobs);
+router.get('/jobs/history', protect, getJobHistory);
 router.post('/jobs/:id/accept', protect, acceptJob);
 router.post('/jobs/:id/reject', protect, rejectJob);
 router.post('/jobs/:id/start', protect, startJob);
+router.post('/jobs/:id/arrive', protect, arriveBooking);
 router.post('/jobs/:id/complete', protect, upload.array('afterImages', 5), completeJob);
 router.post('/jobs/:id/status', protect, updateJobStatus);
 router.post('/jobs/:id/confirm', protect, confirmCompletion);
+
+// Reliability
+router.get('/me/reliability', protect, getMyReliability);
+router.get('/me/reliability/history', protect, getMyReliabilityHistory);
+router.post('/me/appeals', protect, submitAppeal);
+router.get('/me/appeals', protect, getMyAppeals);
 
 // Location
 router.put('/location', protect, updateLocation);

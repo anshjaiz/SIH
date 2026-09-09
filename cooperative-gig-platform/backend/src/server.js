@@ -129,9 +129,11 @@ app.use(errorHandler);
 const startServer = async () => {
   try {
     await connectDB();
-    server.listen(port, () => {
+    server.listen(port, async () => {
       console.log(`🚀 Server running on port ${port}`);
       console.log(`Health check: http://localhost:${port}/api/health`);
+      // Worker reliability scheduler: job expiry + no-show detection cron.
+      require('./services/reliability/scheduler').startScheduler();
       // Warm-up: run the AI pipeline quietly in the background so forecasts
       // and learned models exist from the very first request.
       require('./services/ai/aiPipelineService')

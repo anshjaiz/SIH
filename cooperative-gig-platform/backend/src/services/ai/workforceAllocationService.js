@@ -15,7 +15,7 @@ const DemandRecord = require('../../models/DemandRecord');
 const Forecast = require('../../models/Forecast');
 const demandForecast = require('./demandForecastService');
 
-const ACTIVE_STATUSES = ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'];
+const ACTIVE_STATUSES = ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
 
 // skill name -> service category inference (used only to bucket workers)
 const CATEGORY_KEYWORDS = [

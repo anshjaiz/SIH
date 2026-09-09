@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 delete L.Icon.Default.prototype._getIconUrl;
 
 const pinIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconUrl: '/images/markers/marker-icon-blue.png',
+  iconRetinaUrl: '/images/markers/marker-icon-2x-blue.png',
+  shadowUrl: '/images/markers/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -21,6 +21,23 @@ function ClickHandler({ onPick }) {
       onPick(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+}
+
+// Keep the visible map centred on the chosen pin (GPS or map click), so the
+// user immediately sees their location instead of a map of the old spot.
+function FollowPin({ lat, lng }) {
+  const map = useMap();
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      map.flyTo([lat, lng], Math.max(map.getZoom(), 13), { duration: 0.8 });
+    }
+  }, [lat, lng, map]);
   return null;
 }
 
@@ -106,6 +123,7 @@ export default function LocationPicker({ value, onChange }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <ClickHandler onPick={handlePick} />
+          <FollowPin lat={lat} lng={lng} />
           <Marker position={[lat, lng]} icon={pinIcon} />
         </MapContainer>
       </div>

@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Worker = require('../models/WorkerProfile');
 const { jwtSecret } = require('../config/env');
+const { suspensionStatus } = require('../utils/workerStatus');
 
 // Protect routes - verify JWT token
 exports.protect = async (req, res, next) => {
@@ -40,6 +42,22 @@ exports.protect = async (req, res, next) => {
     }
 
     req.user = user;
+
+    // Workers under administrative suspension are blocked from every API call
+    // (with a descriptive message) so an already-open session cannot keep working.
+    if (user.role === 'worker') {
+      const workerProfile = await Worker.findOne({ user: user._id });
+      const status = suspensionStatus(workerProfile);
+      if (status) {
+        return res.status(403).json({
+          success: false,
+          code: status.code,
+          message: status.message,
+          suspendedUntil: status.suspendedUntil || undefined,
+        });
+      }
+    }
+
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {

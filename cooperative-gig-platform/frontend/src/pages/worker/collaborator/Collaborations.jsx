@@ -3,6 +3,7 @@ import useCollaborator from '../../../hooks/useCollaborator';
 import CollaborationInviteCard from '../../../components/collaborator/CollaborationInviteCard';
 import CollaboratorProfileCard from '../../../components/collaborator/CollaboratorProfileCard';
 import MyTeamJobs from '../../../components/collaborator/MyTeamJobs';
+import MySentRequests from '../../../components/collaborator/MySentRequests';
 
 export default function Collaborations() {
   const { invites, loading, refresh, respond } = useCollaborator();
@@ -17,6 +18,7 @@ export default function Collaborations() {
 
   const tabs = [
     { id: 'jobs', label: `✅ My Team Jobs` },
+    { id: 'sent', label: `📨 My Requests` },
     { id: 'invites', label: `🤝 Opportunities${invites.length ? ` (${invites.length})` : ''}` },
   ];
 
@@ -43,7 +45,9 @@ export default function Collaborations() {
 
       <CollaboratorProfileCard />
 
-      {tab === 'invites' ? (
+      {tab === 'sent' ? (
+        <MySentRequests />
+      ) : tab === 'invites' ? (
         loading ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>

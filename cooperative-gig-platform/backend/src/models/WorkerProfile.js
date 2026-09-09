@@ -83,6 +83,16 @@ const workerProfileSchema = new mongoose.Schema(
     },
     suspendedFrom: Date,
     suspendedUntil: Date,
+    // 3-strike tracking: counts administrative suspensions toward permanent termination
+    suspensionCount: {
+      type: Number,
+      default: 0,
+    },
+    terminatedAt: Date,
+    terminationReason: {
+      type: String,
+      default: '',
+    },
     // Disciplinary history
     warnings: [
       {

@@ -9,6 +9,7 @@ export default function CollaborationInviteCard({ invite, onRespond, responding 
   const leadName = invite.leadWorker?.user?.name || lead?.user?.name || 'Another worker';
   const myScore = invite.myScore;
   const reasons = invite.myReasons || [];
+  const alreadyAccepted = invite.myStatus === 'ACCEPTED';
 
   return (
     <div className="card">
@@ -48,22 +49,28 @@ export default function CollaborationInviteCard({ invite, onRespond, responding 
         </div>
       )}
 
-      <div className="flex gap-3">
-        <button
-          onClick={() => onRespond(invite._id, 'ACCEPT')}
-          disabled={responding}
-          className="btn-success flex-1"
-        >
-          ✓ Accept
-        </button>
-        <button
-          onClick={() => onRespond(invite._id, 'DECLINE')}
-          disabled={responding}
-          className="btn-secondary flex-1"
-        >
-          Decline
-        </button>
-      </div>
+      {alreadyAccepted ? (
+        <div className="rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm font-medium p-3 text-center">
+          ✅ You've accepted this collaboration — view it under "My Team Jobs"
+        </div>
+      ) : (
+        <div className="flex gap-3">
+          <button
+            onClick={() => onRespond(invite._id, 'ACCEPT')}
+            disabled={responding}
+            className="btn-success flex-1"
+          >
+            ✓ Accept
+          </button>
+          <button
+            onClick={() => onRespond(invite._id, 'DECLINE')}
+            disabled={responding}
+            className="btn-secondary flex-1"
+          >
+            Decline
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -144,7 +144,10 @@ const suspendWorker = asyncHandler(async (req, res) => {
     reason,
     byUserId: req.user._id,
   });
-  res.json({ success: true, message: 'Worker suspended', data: result });
+  const message = result.terminated
+    ? 'Worker permanently TERMINATED (3rd suspension). Account closed.'
+    : `Worker suspended (suspension ${result.suspensionCount}/3).`;
+  res.json({ success: true, message, data: result });
 });
 
 module.exports = {

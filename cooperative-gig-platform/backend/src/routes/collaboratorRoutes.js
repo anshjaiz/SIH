@@ -4,6 +4,7 @@ const {
   createCollaborationRequest,
   getCollaborationRequest,
   getRequestsForBooking,
+  getMySentRequests,
   getMyCollaborationRequests,
   respondCollaborationRequest,
   cancelCollaborationRequest,
@@ -23,6 +24,7 @@ router.get('/profile', getCollaboratorProfile);
 // Collaboration requests / team formation
 router.post('/requests', authorize('worker'), createCollaborationRequest);
 router.get('/requests/mine', authorize('worker'), getMyCollaborationRequests);
+router.get('/requests/sent', authorize('worker'), getMySentRequests);
 router.get('/requests/booking/:bookingId', getRequestsForBooking);
 router.get('/requests/:id', getCollaborationRequest);
 router.post('/requests/:id/respond', authorize('worker'), respondCollaborationRequest);

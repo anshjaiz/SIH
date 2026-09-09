@@ -3,7 +3,15 @@ const Worker = require('../../models/WorkerProfile');
 const Customer = require('../../models/CustomerProfile');
 const Notification = require('../../models/Notification');
 const { generateToken, sanitizeUser, generateOTP } = require('../../utils/authHelper');
+const { suspensionStatus } = require('../../utils/workerStatus');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
+
+// Returns a suspension/termination status for a worker, or null if the worker is active.
+const getWorkerSuspension = async (user) => {
+  if (user.role !== 'worker') return null;
+  const workerProfile = await Worker.findOne({ user: user._id });
+  return suspensionStatus(workerProfile);
+};
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -87,6 +95,9 @@ const login = asyncHandler(async (req, res) => {
   if (!user || !(await user.matchPassword(password))) {
     throw new ApiError('Invalid email or password', 401);
   }
+
+  const status = await getWorkerSuspension(user);
+  if (status) throw new ApiError(status.message, 403);
 
   if (!user.isActive) {
     throw new ApiError('Your account has been deactivated. Contact support.', 403);

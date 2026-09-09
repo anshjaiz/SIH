@@ -5,15 +5,7 @@ const Certificate = require('../../models/Certificate');
 const WorkerAvailability = require('../../models/WorkerAvailability');
 const Notification = require('../../models/Notification');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
-
-// Auto-verify a worker once they add skills + have a location,
-// so real (non-seeded) workers enter the fair-matching pool.
-const autoVerifyWorker = async (worker) => {
-  if (worker.verificationStatus === 'PENDING' && worker.skills && worker.skills.length > 0) {
-    worker.verificationStatus = 'VERIFIED';
-    worker.verificationRemark = 'Auto-verified after adding skills';
-  }
-};
+const syncWorkerLocation = require('../../utils/syncWorkerLocation');
 
 // -------------------- Worker profile --------------------
 
@@ -66,8 +58,14 @@ const updateOwnProfile = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, { avatar: req.file.path });
   }
 
-  await autoVerifyWorker(worker);
   await worker.save();
+
+  // A location update from the "where are you working today?" modal must also
+  // flow into live tracking (booking.workerLocation + socket), otherwise the
+  // customer's map keeps showing only the service-location pin.
+  if (req.body.location && Array.isArray(req.body.location.coordinates)) {
+    await syncWorkerLocation(worker, req.body.location.coordinates);
+  }
 
   res.json({ success: true, message: 'Profile updated', data: worker });
 });
@@ -101,7 +99,6 @@ const addSkill = asyncHandler(async (req, res) => {
     yearsOfExperience: yearsOfExperience || 0,
   });
 
-  await autoVerifyWorker(worker);
   await worker.save();
 
   res.status(201).json({ success: true, message: 'Skill added', data: worker });

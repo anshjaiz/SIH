@@ -5,6 +5,7 @@ const Notification = require('../../models/Notification');
 const Payment = require('../../models/Payment');
 const Invoice = require('../../models/Invoice');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
+const syncWorkerLocation = require('../../utils/syncWorkerLocation');
 const { getIO } = require('../../config/socket');
 const { computeWorkerEarnings } = require('../../utils/pricingUtils');
 const Cooperative = require('../../models/Cooperative');
@@ -245,7 +246,10 @@ const updateLocation = asyncHandler(async (req, res) => {
   const worker = await Worker.findOne({ user: req.user._id });
   if (!worker) throw new ApiError('Worker profile not found', 404);
 
-  const { coordinates } = req.body;
+  let { coordinates } = req.body;
+  if (!coordinates && req.body.location && Array.isArray(req.body.location.coordinates)) {
+    coordinates = req.body.location.coordinates;
+  }
   if (!coordinates || !Array.isArray(coordinates)) {
     throw new ApiError('Invalid coordinates', 400);
   }
@@ -253,51 +257,7 @@ const updateLocation = asyncHandler(async (req, res) => {
   worker.location = { type: 'Point', coordinates };
   await worker.save();
 
-  // Also update active booking worker location
-  const activeBooking = await Booking.findOneAndUpdate(
-    {
-      worker: worker._id,
-      status: { $in: ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'STARTED'] },
-    },
-    {
-      workerLocation: { type: 'Point', coordinates },
-      'statusHistory.$.lastUpdatedAt': new Date(),
-    },
-    { new: true }
-  );
-
-  if (activeBooking) {
-    const io = getIO();
-    if (io) io.to(`customer_${activeBooking.customer}`).emit('worker_location', {
-      bookingId: activeBooking._id,
-      coordinates,
-    });
-  }
-
-  // Helper tracking: if this worker is a checked-in collaborator on an active
-  // team, persist + broadcast their live location to the lead worker's room.
-  const io = getIO();
-  if (io) {
-    const teams = await JobTeam.find({
-      'members.worker': worker._id,
-      'members.status': 'ACCEPTED',
-      completed: false,
-    });
-    for (const team of teams) {
-      const member = (team.members || []).find((m) => m.worker.toString() === worker._id.toString());
-      if (!member || !member.joinedAt) continue;
-      member.location = { type: 'Point', coordinates };
-      member.lastLocationUpdate = new Date();
-      await team.save();
-      io.to(`worker_${team.leadWorker.toString()}`).emit('worker_location', {
-        helperId: worker._id,
-        bookingId: team.booking,
-        role: member.role,
-        coordinates,
-        lastLocationUpdate: member.lastLocationUpdate,
-      });
-    }
-  }
+  await syncWorkerLocation(worker, coordinates);
 
   res.json({ success: true, message: 'Location updated' });
 });

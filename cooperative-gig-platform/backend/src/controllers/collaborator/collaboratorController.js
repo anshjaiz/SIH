@@ -19,10 +19,10 @@ const getWorkerId = async (userId) => {
   return worker ? worker._id : null;
 };
 
-const populateUserFields = {
-  path: 'user',
-  select: 'name email phone avatar role',
-};
+const populateUser = (path) => ({
+  path,
+  populate: { path: 'user', select: 'name email phone avatar role' },
+});
 
 // -------------------- Create --------------------
 
@@ -103,8 +103,8 @@ const createCollaborationRequest = asyncHandler(async (req, res) => {
 const getCollaborationRequest = asyncHandler(async (req, res) => {
   const request = await CollaborationRequest.findById(req.params.id)
     .populate('booking')
-    .populate('leadWorker', populateUserFields)
-    .populate('candidates.worker', populateUserFields);
+    .populate(populateUser('leadWorker'))
+    .populate(populateUser('candidates.worker'));
 
   if (!request) throw new ApiError('Collaboration request not found', 404);
 
@@ -122,13 +122,29 @@ const getCollaborationRequest = asyncHandler(async (req, res) => {
 const getRequestsForBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
   const workerId = await getWorkerId(req.user._id);
-  const requests = await CollaborationRequest.find({ booking: bookingId }).populate('leadWorker', populateUserFields).populate('candidates.worker', populateUserFields);
+  const requests = await CollaborationRequest.find({ booking: bookingId })
+    .populate(populateUser('leadWorker'))
+    .populate(populateUser('candidates.worker'));
   if (req.user.role !== 'admin') {
     const mine = requests.filter(
       (r) => r.leadWorker._id.toString() === (workerId ? workerId.toString() : '')
     );
     return res.json({ success: true, data: mine });
   }
+  res.json({ success: true, data: requests });
+});
+
+// Collaboration requests sent by the lead worker (so the lead can see who accepted)
+const getMySentRequests = asyncHandler(async (req, res) => {
+  const workerId = await getWorkerId(req.user._id);
+  if (!workerId) return res.json({ success: true, data: [] });
+
+  const requests = await CollaborationRequest.find({ leadWorker: workerId })
+    .populate('booking')
+    .populate(populateUser('leadWorker'))
+    .populate(populateUser('candidates.worker'))
+    .sort({ createdAt: -1 });
+
   res.json({ success: true, data: requests });
 });
 
@@ -142,7 +158,7 @@ const getMyCollaborationRequests = asyncHandler(async (req, res) => {
     status: { $in: ['OPEN'] },
   })
     .populate('booking')
-    .populate('leadWorker', populateUserFields)
+    .populate(populateUser('leadWorker'))
     .populate('candidates.worker', 'user rating ratingCount collaborationsCount')
     .sort({ createdAt: -1 });
 
@@ -388,6 +404,7 @@ module.exports = {
   createCollaborationRequest,
   getCollaborationRequest,
   getRequestsForBooking,
+  getMySentRequests,
   getMyCollaborationRequests,
   respondCollaborationRequest,
   cancelCollaborationRequest,

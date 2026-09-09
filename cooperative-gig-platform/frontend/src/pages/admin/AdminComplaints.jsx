@@ -229,11 +229,17 @@ export default function AdminComplaints() {
                 </p>
                 <div className="flex flex-wrap gap-2 mt-1 text-[11px]">
                   <span className={`badge ${detail.workerProfile?.isActive === false ? 'badge-danger' : 'badge-success'}`}>
-                    {detail.workerProfile?.isActive === false ? 'Suspended' : 'Active'}
+                    {detail.workerProfile?.terminatedAt ? 'Terminated (permanent)' : detail.workerProfile?.isActive === false ? 'Suspended' : 'Active'}
                   </span>
                   <span className="badge badge-gray">Verification: {detail.workerProfile?.verificationStatus}</span>
                   <span className="badge badge-gray">{detail.workerProfile?.completedJobs || 0} jobs</span>
                   {detail.workerProfile?.rating > 0 && <span className="badge badge-gray">⭐ {detail.workerProfile.rating.toFixed(1)}</span>}
+                  <span className={`badge ${(detail.workerProfile?.suspensionCount || 0) >= 3 ? 'badge-danger' : 'badge-warning'}`}>
+                    {detail.workerProfile?.suspensionCount ? `Suspensions ${detail.workerProfile.suspensionCount}/3` : 'No prior suspensions'}
+                  </span>
+                  {detail.workerProfile?.suspendedUntil && !detail.workerProfile.terminatedAt && (
+                    <span className="badge badge-warning">Until {new Date(detail.workerProfile.suspendedUntil).toLocaleDateString()}</span>
+                  )}
                 </div>
                 {detail.workerProfile?.suspensionNote && (
                   <p className="text-xs text-red-600 mt-1">Note: {detail.workerProfile.suspensionNote}</p>

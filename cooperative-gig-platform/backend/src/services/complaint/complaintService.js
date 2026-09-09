@@ -423,40 +423,72 @@ const suspendWorker = async ({ complaintId, temporary = true, until = null, reas
   if (!profile) throw new ApiError('Worker not found', 404);
 
   const now = new Date();
-  profile.isActive = false;
-  profile.suspensionNote = reason || 'Suspended in connection with a safety complaint';
-  profile.suspendedFrom = now;
-  if (temporary && until) profile.suspendedUntil = new Date(until);
+
+  // 3-strike rule: count every suspension; the 3rd one permanently terminates.
+  profile.suspensionCount = (profile.suspensionCount || 0) + 1;
+  const strike = profile.suspensionCount;
+  let terminated = false;
+
+  if (strike >= 3 || temporary === false) {
+    terminated = true;
+    profile.isActive = false;
+    profile.suspendedFrom = now;
+    profile.suspendedUntil = undefined;
+    profile.terminatedAt = now;
+    profile.terminationReason = reason || 'Permanently terminated after repeated suspensions';
+    profile.suspensionNote = reason || 'Permanently terminated after repeated suspensions';
+    await User.updateOne({ _id: profile.user }, { isActive: false });
+  } else {
+    profile.isActive = false;
+    profile.suspendedFrom = now;
+    profile.suspensionNote = reason || 'Suspended in connection with a safety complaint';
+    if (until) profile.suspendedUntil = new Date(until);
+  }
 
   complaint.workerAction = {
     suspensionApplied: true,
-    suspensionType: temporary ? 'TEMPORARY' : 'PERMANENT',
-    suspensionReason: reason || 'Safety complaint',
-    suspensionUntil: until ? new Date(until) : undefined,
+    suspensionType: terminated ? 'PERMANENT' : temporary ? 'TEMPORARY' : 'PERMANENT',
+    suspensionReason: reason || (terminated ? 'Repeated suspensions' : 'Safety complaint'),
+    suspensionUntil: terminated ? undefined : until ? new Date(until) : undefined,
+    suspensionStrike: strike,
+    terminated,
     appliedAt: now,
     appliedBy: byUserId,
   };
-  complaint.history.push({ status: complaint.status, action: 'WORKER_SUSPENDED', by: byUserId, note: `${temporary ? 'Temporary' : 'Permanent'} suspension — ${reason || ''}` });
+  complaint.history.push({
+    status: complaint.status,
+    action: terminated ? 'WORKER_TERMINATED' : 'WORKER_SUSPENDED',
+    by: byUserId,
+    note: terminated
+      ? `Permanently terminated — 3rd suspension (why: ${reason || ''})`
+      : `Suspension ${strike}/3 — ${reason || ''}`,
+  });
 
   await Promise.all([profile.save(), complaint.save()]);
 
   await createNotification({
     user: profile.user,
-    type: 'ACCOUNT_SUSPENDED',
-    title: 'Your account has been suspended',
-    message: temporary ? `Your account is temporarily blocked from new bookings${until ? ` until ${new Date(until).toLocaleDateString()}` : ''}. ${reason || ''}` : 'Your account has been suspended permanently.',
+    type: terminated ? 'ACCOUNT_TERMINATED' : 'ACCOUNT_SUSPENDED',
+    title: terminated ? 'Your account has been permanently terminated' : `Your account has been suspended (${strike}/3)`,
+    message: terminated
+      ? 'Your account has been permanently terminated from the platform after repeated suspensions.'
+      : temporary && until
+        ? `Your account is suspended until ${new Date(until).toLocaleDateString()}. ${strike}/3 strikes used. ${reason || ''}`
+        : `Your account is temporarily blocked from new bookings. ${strike}/3 strikes used. ${reason || ''}`,
     data: { complaintId: complaint._id, workerId: profile._id },
   });
   await notifyUsers(
     (await User.find({ role: 'admin' }).select('_id')).map((a) => ({
       user: a._id,
-      type: 'ACCOUNT_SUSPENDED',
-      title: `Worker suspended (${complaint.complaintNumber})`,
+      type: terminated ? 'ACCOUNT_TERMINATED' : 'ACCOUNT_SUSPENDED',
+      title: terminated
+        ? `Worker TERMINATED (${complaint.complaintNumber})`
+        : `Worker suspended ${strike}/3 (${complaint.complaintNumber})`,
       message: reason || 'Safety-related suspension applied',
       data: { complaintId: complaint._id, workerId: profile._id },
     }))
   );
-  return { complaint, worker: profile };
+  return { complaint, worker: profile, suspensionCount: strike, terminated };
 };
 
 /**

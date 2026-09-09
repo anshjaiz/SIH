@@ -34,6 +34,7 @@ const notificationSchema = new mongoose.Schema(
         'COMPLAINT_RESOLVED',
         'COMPLAINT_ESCALATED',
         'ACCOUNT_SUSPENDED',
+        'ACCOUNT_TERMINATED',
         'DEMAND_SPIKE',
         'CUSTOM_REQUEST',
         'SYSTEM',

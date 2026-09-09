@@ -31,7 +31,7 @@ const jobTeamSchema = new mongoose.Schema(
         },
         status: {
           type: String,
-          enum: ['INVITED', 'ACCEPTED', 'DECLINED', 'COMPLETED'],
+          enum: ['INVITED', 'ACCEPTED', 'DECLINED', 'COMPLETED', 'NO_SHOW'],
           default: 'INVITED',
         },
         paymentEstimate: {
@@ -41,6 +41,7 @@ const jobTeamSchema = new mongoose.Schema(
         invitedAt: Date,
         acceptedAt: Date,
         joinedAt: Date,
+        noShowDetectedAt: Date,
         location: {
           type: { type: String, enum: ['Point'], default: 'Point' },
           coordinates: { type: [Number], default: undefined },

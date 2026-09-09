@@ -35,6 +35,9 @@ const Booking = require('../src/models/Booking');
 const Worker = require('../src/models/WorkerProfile');
 const ReliabilityEvent = require('../src/models/ReliabilityEvent');
 const PenaltyAppeal = require('../src/models/PenaltyAppeal');
+const JobTeam = require('../src/models/JobTeam');
+const CollaborationRequest = require('../src/models/CollaborationRequest');
+const { getSettings } = require('../src/services/reliability/reliabilityConfig');
 
 const BASE = 'http://localhost:5001/api';
 const SERVICE_ID = '6aa01569a9f6f5694c19b477'; // Deep House Cleaning (Cleaning/Domestic Help)
@@ -357,6 +360,146 @@ const createBooking = async (token, overrides = {}) => {
     s = await score();
     check('CASE4 expiry does not penalise worker', s.doc.score === preExpiry, `score ${preExpiry} -> ${s.doc.score}`);
   } catch (e) { check('CASE4 expiry', false, e.message); }
+
+  // ============ CASE 13: collaboration no-show + stale-open expiry ============
+  let B9, CR1, CR2;
+  try {
+    const settings = await getSettings();
+    const collabPenalty = settings.points.collabNoShow;
+
+    // A booking to hang the collaboration on.
+    B9 = await createBooking(customerToken, { description: 'E2E collab no-show test job' });
+
+    // Lead worker (synthetic id) + offending collaborator (worker20).
+    const leadWorker = new mongoose.Types.ObjectId();
+    const pastDate = new Date(Date.now() - 2 * 86400000); // two days ago
+
+    CR1 = await CollaborationRequest.create({
+      booking: B9._id,
+      leadWorker,
+      role: 'Helper',
+      numberOfCollaborators: 1,
+      date: pastDate,
+      startTime: '09:00',
+      durationHours: 4,
+      status: 'FILLED',
+      candidates: [{ worker: worker20Id, score: 90, reasons: ['test'], status: 'ACCEPTED', respondedAt: pastDate }],
+    });
+    await JobTeam.create({
+      booking: B9._id,
+      leadWorker,
+      collaborationRequest: CR1._id,
+      members: [
+        { worker: worker20Id, role: 'Helper', status: 'ACCEPTED', paymentEstimate: 100, invitedAt: pastDate, acceptedAt: pastDate, joinedAt: null },
+      ],
+    });
+
+    s = await score();
+    const preNoShowC = s.doc.score;
+
+    await runSchedulerOnce();
+
+    const teamAfter = await JobTeam.findOne({ booking: B9._id }).lean();
+    const memb = (teamAfter.members || []).find((m) => m.worker.toString() === worker20Id);
+    check('CASE13 collaborator marked NO_SHOW', memb && memb.status === 'NO_SHOW', JSON.stringify(memb));
+
+    s = await score();
+    check('CASE13 collaboration no-show penalty', s.doc.score === preNoShowC + collabPenalty, `expected ${preNoShowC + collabPenalty}, got ${s.doc.score} | ev=${JSON.stringify(s.events[0])}`);
+    check('CASE13 COLLAB_NO_SHOW event recorded', s.events.some((e) => e.eventType === 'COLLAB_NO_SHOW' && String(e.booking) === String(B9._id)), '');
+    check('CASE13 collabNoShowCount incremented', s.doc.collabNoShowCount === 1, `got ${s.doc.collabNoShowCount}`);
+
+    // Idempotency: repeated ticks must not re-penalise.
+    await runSchedulerOnce();
+    await runSchedulerOnce();
+    const evCount = await ReliabilityEvent.countDocuments({ worker: worker20Id, booking: B9._id, eventType: 'COLLAB_NO_SHOW' });
+    check('CASE13 collab no-show idempotent (no duplicate)', evCount === 1, `count=${evCount}`);
+
+    // Stale OPEN invitation far past its date should be expired + pending declined.
+    CR2 = await CollaborationRequest.create({
+      booking: B9._id,
+      leadWorker,
+      role: 'Helper',
+      numberOfCollaborators: 2,
+      date: new Date(Date.now() - 5 * 86400000),
+      startTime: '09:00',
+      durationHours: 4,
+      status: 'OPEN',
+      candidates: [
+        { worker: worker20Id, score: 90, reasons: ['test'], status: 'PENDING' },
+      ],
+    });
+    await runSchedulerOnce();
+    const cr2 = await CollaborationRequest.findById(CR2._id).lean();
+    check('CASE13 stale OPEN invitation expired', cr2.status === 'EXPIRED' && cr2.candidates[0].status === 'DECLINED', `${cr2.status} / ${cr2.candidates[0].status}`);
+
+    // Hygiene: drop the synthetic collaboration docs + booking.
+    await JobTeam.deleteMany({ booking: B9._id });
+    await CollaborationRequest.deleteMany({ booking: B9._id });
+    await Booking.deleteMany({ _id: B9._id });
+  } catch (e) { check('CASE13 collaboration no-show', false, e.stack); }
+
+  // ============ CASE 14: every-5-jobs milestone reward (+jobMilestoneBonus) ============
+  let B10;
+  try {
+    const settings = await getSettings();
+    const bonus = settings.points.jobMilestoneBonus;
+    const WorkerReliability = require('../src/models/WorkerReliability');
+    s = await score();
+    const preM = s.doc.score;
+    // Bump completedCount to 4 so the next completion crosses the 5th milestone.
+    await WorkerReliability.updateOne({ worker: worker20Id }, { $set: { completedCount: 4 } });
+
+    B10 = await createBooking(customerToken, { description: 'E2E job milestone test job' });
+    await Booking.updateOne({ _id: B10._id }, { $set: {
+      status: 'IN_PROGRESS', worker: worker20Id, acceptedAt: new Date(),
+      scheduledStartTime: new Date(Date.now() - 5 * 3600 * 1000),
+      scheduledEndTime: new Date(Date.now() - 4 * 3600 * 1000), // in past → not on-time
+    } });
+    const done = await call('POST', `/workers/jobs/${B10._id}/complete`, { token: workerToken, json: {} });
+    check('CASE14 complete 5th job endpoint', done.status === 200, `${done.status}`);
+    await new Promise((r) => setTimeout(r, 500));
+
+    s = await score();
+    check('CASE14 every-5-jobs milestone bonus', s.doc.completedCount === 5 && s.events.some((e) => e.eventType === 'MILESTONE_JOBS_COMPLETED' && e.points === bonus), `count=${s.doc.completedCount} ev=${JSON.stringify(s.events[0])}`);
+    check('CASE14 milestone not double-counted', s.events.filter((e) => e.eventType === 'MILESTONE_JOBS_COMPLETED').length === 1, '');
+    check('CASE14 milestone applied to score', s.doc.score === preM + bonus + settings.points.completeJob, `expected ${preM + bonus + settings.points.completeJob}, got ${s.doc.score}`);
+  } catch (e) { check('CASE14 job milestone', false, e.stack); }
+
+  // ============ CASE 15: every-5-collaborations milestone reward (+collabMilestoneBonus) ============
+  let B11;
+  try {
+    const settings = await getSettings();
+    const bonus = settings.points.collabMilestoneBonus;
+
+    // CollaborationsCount 4 → next completed collaboration crosses the 5th milestone.
+    await Worker.updateOne({ _id: worker20Id }, { $set: { collaborationsCount: 4 } });
+    s = await score();
+    const preCollab = s.doc.score;
+
+    B11 = await createBooking(customerToken, { description: 'E2E collab milestone test job' });
+    const CR3 = await CollaborationRequest.create({
+      booking: B11._id, leadWorker: new mongoose.Types.ObjectId(), role: 'Helper',
+      numberOfCollaborators: 1, date: new Date(Date.now() - 1 * 86400000), startTime: '09:00', durationHours: 4,
+      status: 'FILLED', candidates: [{ worker: worker20Id, status: 'ACCEPTED', score: 90, reasons: ['test'] }],
+    });
+    await JobTeam.create({
+      booking: B11._id, leadWorker: new mongoose.Types.ObjectId(), collaborationRequest: CR3._id,
+      members: [{ worker: worker20Id, role: 'Helper', status: 'ACCEPTED', invitedAt: new Date(), acceptedAt: new Date() }],
+    });
+
+    const { completeTeam } = require('../src/services/collaborator/teamFormationService');
+    await completeTeam(B11._id);
+    await new Promise((r) => setTimeout(r, 400));
+
+    s = await score();
+    const w20 = await Worker.findById(worker20Id).select('collaborationsCount').lean();
+    check('CASE15 every-5-collabs milestone bonus', w20.collaborationsCount === 5 && s.events.some((e) => e.eventType === 'MILESTONE_COLLABS_COMPLETED' && e.points === bonus), `collabCount=${w20.collaborationsCount} ev=${JSON.stringify(s.events[0])}`);
+    check('CASE15 collab milestone applied to score', s.doc.score === preCollab + bonus, `expected ${preCollab + bonus}, got ${s.doc.score}`);
+
+    await JobTeam.deleteMany({ booking: B11._id });
+    await CollaborationRequest.deleteMany({ booking: B11._id });
+    await Booking.deleteMany({ _id: B11._id });
+  } catch (e) { check('CASE15 collab milestone', false, e.stack); }
 
   // ============ summary ============
   const passed = results.filter((r) => r.ok).length;

@@ -248,6 +248,7 @@ export default function ActiveJobs() {
                                 <span className={`badge px-2 py-0.5 ${
                                   c.status === 'ACCEPTED' ? 'bg-green-100 text-green-700'
                                   : c.status === 'DECLINED' ? 'bg-red-100 text-red-600'
+                                  : c.status === 'NO_SHOW' ? 'bg-red-100 text-red-600'
                                   : 'bg-yellow-100 text-yellow-700'
                                 }`}>
                                   {c.status}

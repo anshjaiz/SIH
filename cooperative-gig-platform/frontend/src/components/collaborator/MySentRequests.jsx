@@ -12,6 +12,7 @@ const STATUS_BADGE = {
   PENDING: 'bg-gray-100 text-gray-600',
   ACCEPTED: 'bg-green-100 text-green-700',
   DECLINED: 'bg-red-100 text-red-600',
+  NO_SHOW: 'bg-red-100 text-red-600',
   REVOKED: 'bg-gray-200 text-gray-500',
 };
 
@@ -19,6 +20,7 @@ const REQ_STATUS_BADGE = {
   OPEN: 'bg-blue-100 text-blue-700',
   FILLED: 'bg-green-100 text-green-700',
   CANCELLED: 'bg-gray-200 text-gray-600',
+  EXPIRED: 'bg-gray-200 text-gray-600',
 };
 
 export default function MySentRequests() {

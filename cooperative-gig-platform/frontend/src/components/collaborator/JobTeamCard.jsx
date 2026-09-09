@@ -3,6 +3,7 @@ const MEMBER_STATUS_COLORS = {
   ACCEPTED: 'bg-green-100 text-green-700',
   DECLINED: 'bg-red-100 text-red-600',
   COMPLETED: 'bg-gray-200 text-gray-700',
+  NO_SHOW: 'bg-red-100 text-red-600',
 };
 
 const toRad = (n) => (n * Math.PI) / 180;

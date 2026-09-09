@@ -101,7 +101,7 @@ const collaborationRequestSchema = new mongoose.Schema(
         reasons: [String],
         status: {
           type: String,
-          enum: ['PENDING', 'ACCEPTED', 'DECLINED'],
+          enum: ['PENDING', 'ACCEPTED', 'DECLINED', 'NO_SHOW'],
           default: 'PENDING',
         },
         respondedAt: Date,

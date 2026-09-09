@@ -16,11 +16,17 @@
  *  - Reassignment retry: REASSIGNED jobs with no acceptance within the
  *    reassignment grace are re-matched (up to maxRetries) then expire.
  *  - Reminders: workers get a gentle reminder before their accepted job.
+ *  - Collaboration no-shows: a collaborator who ACCEPTED but never checked in
+ *    (joinedAt null) after the collaboration window (+ grace) is penalised and
+ *    their team member is marked NO_SHOW. Stale OPEN invitations whose window
+ *    has passed are expired.
  */
 
 const Booking = require('../../models/Booking');
 const User = require('../../models/User');
 const Worker = require('../../models/WorkerProfile');
+const JobTeam = require('../../models/JobTeam');
+const CollaborationRequest = require('../../models/CollaborationRequest');
 const { resolveScheduleTimes } = require('../../utils/scheduleUtils');
 const { getSettings } = require('./reliabilityConfig');
 const {
@@ -277,6 +283,112 @@ const handleReminders = async (settings, now) => {
 };
 
 /**
+ * Parse an "HH:mm" clock string into [hours, minutes] (defaults 09:00).
+ */
+const parseClock = (clock) => {
+  const parts = String(clock || '09:00').split(':');
+  return [parseInt(parts[0], 10) || 9, parseInt(parts[1], 10) || 0];
+};
+
+/**
+ * Collaboration end instant = request.date + startTime + durationHours, anchored
+ * to the server-local calendar day (mirrors the booking slot derivation).
+ */
+const collabEndTime = (request) => {
+  if (!request || !request.date) return null;
+  const [h, m] = parseClock(request.startTime);
+  const start = new Date(request.date);
+  start.setHours(h, m, 0, 0);
+  return new Date(start.getTime() + ((request.durationHours ?? 4) || 0) * hourMs);
+};
+
+/**
+ * Detect collaboration no-shows and expire stale invitations.
+ *
+ * No-show: a team member who is still ACCEPTED with no joinedAt (never checked
+ * in) once the collaboration window + grace has passed → member marked NO_SHOW
+ * and penalised collabNoShow points. applyScoreChange's per-booking dedup makes
+ * repeated ticks idempotent.
+ *
+ * Stale invites: OPEN requests whose window has fully passed without being
+ * filled are closed (EXPIRED) and still-pending candidates marked DECLINED.
+ */
+const handleCollaboratorNoShows = async (settings, now) => {
+  const graceMs = (settings.noShowGraceMinutes ?? 15) * minuteMs;
+  const results = [];
+
+  // 1) Close stale OPEN collaboration requests whose job already happened.
+  const staleOpen = await CollaborationRequest.find({ status: 'OPEN' })
+    .select('_id date startTime durationHours status candidates');
+  const staleIds = [];
+  for (const req of staleOpen) {
+    const end = collabEndTime(req);
+    if (!end || now.getTime() <= end.getTime() + graceMs) continue;
+    req.status = 'EXPIRED';
+    req.candidates.forEach((c) => {
+      if (c.status === 'PENDING') {
+        c.status = 'DECLINED';
+        c.respondedAt = now;
+      }
+    });
+    await req.save();
+    staleIds.push(req._id);
+  }
+  if (staleIds.length) {
+    results.push({ requestsExpired: staleIds.length });
+  }
+
+  // 2) Penalise ACCEPTED collaborators that never checked in.
+  const teams = await JobTeam.find({ 'members.status': 'ACCEPTED' }).select(
+    '_id booking collaborationRequest members'
+  );
+  for (const team of teams) {
+    const request = team.collaborationRequest
+      ? await CollaborationRequest.findById(team.collaborationRequest).select(
+          '_id date startTime durationHours status role'
+        )
+      : null;
+    if (!request || ['CANCELLED', 'EXPIRED'].includes(request.status)) continue;
+    const end = collabEndTime(request);
+    if (!end || now.getTime() <= end.getTime() + graceMs) continue;
+
+    for (const member of team.members) {
+      if (member.status !== 'ACCEPTED' || member.joinedAt) continue;
+      const claimed = await JobTeam.updateOne(
+        {
+          _id: team._id,
+          'members.worker': member.worker,
+          'members.status': 'ACCEPTED',
+          'members.joinedAt': null,
+        },
+        { $set: { 'members.$.status': 'NO_SHOW', 'members.$.noShowDetectedAt': now } }
+      );
+      if (claimed.matchedCount === 0) continue;
+
+      // Mirror the no-show onto the invitation so the lead sees who flaked.
+      await CollaborationRequest.updateOne(
+        { _id: request._id, 'candidates.worker': member.worker, 'candidates.status': 'ACCEPTED' },
+        { $set: { 'candidates.$.status': 'NO_SHOW', 'candidates.$.respondedAt': now } }
+      );
+
+      const applied = await applyScoreChange({
+        workerId: member.worker,
+        eventType: 'COLLAB_NO_SHOW',
+        points: settings.points.collabNoShow,
+        reason: `No-show for collaboration ${request.role || 'job'} (deadline ${end.toISOString()})`,
+        bookingId: team.booking,
+        counterField: 'collabNoShowCount',
+        silent: true,
+      });
+      if (!applied.skipped) {
+        results.push({ workerId: member.worker, bookingId: team.booking, outcome: 'NO_SHOW' });
+      }
+    }
+  }
+  return results;
+};
+
+/**
  * Run one full pass of the scheduler. Returns a summary object (for tests).
  */
 const runSchedulerOnce = async () => {
@@ -285,13 +397,14 @@ const runSchedulerOnce = async () => {
   try {
     const settings = await getSettings();
     const now = new Date();
-    const [expired, noShows, retries, reminders] = await Promise.all([
+    const [expired, noShows, retries, reminders, collabNoShows] = await Promise.all([
       handleExpiredJobs(settings, now),
       handleNoShows(settings, now),
       handleReassignmentRetries(settings, now),
       handleReminders(settings, now),
+      handleCollaboratorNoShows(settings, now),
     ]);
-    return { skipped: false, expired, noShows, retries, reminders };
+    return { skipped: false, expired, noShows, retries, reminders, collabNoShows };
   } finally {
     running = false;
   }

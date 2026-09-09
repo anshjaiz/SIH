@@ -175,6 +175,12 @@ const completeTeam = async (bookingId) => {
       { _id: { $in: memberWorkerIds } },
       { $inc: { collaborationsCount: 1 } }
     );
+    // Milestone reward: every 5 completed collaborations → +collabMilestoneBonus.
+    for (const id of memberWorkerIds) {
+      require('../../services/reliability/reliabilityService')
+        .handleCollaborationCompleted(id, bookingId)
+        .catch((e) => console.error('[reliability] collab milestone error:', e.message));
+    }
   }
   return team;
 };

@@ -235,6 +235,7 @@ const applyScoreChange = async ({
 
 /**
  * Job completed → +completeJob points, and +onTime when scheduledEndTime was met.
+ * Every 5 completed jobs also earns the worker a MILESTONE_JOBS_COMPLETED bonus.
  */
 const handleJobCompleted = async (booking, worker, { onTime = false } = {}) => {
   const settings = await getSettings();
@@ -248,19 +249,56 @@ const handleJobCompleted = async (booking, worker, { onTime = false } = {}) => {
   });
 
   const extras = [];
-  if (onTime && !completed.skipped) {
-    extras.push(
-      await applyScoreChange({
-        workerId: worker._id,
-        eventType: 'ON_TIME',
-        points: settings.points.onTime,
-        reason: `Completed job ${booking.bookingNumber} on time`,
-        bookingId: booking._id,
-        counterField: 'onTimeCount',
-      })
-    );
+  if (!completed.skipped) {
+    const newCount = completed.reliability.completedCount || 0;
+    if (newCount > 0 && newCount % 5 === 0) {
+      extras.push(
+        await applyScoreChange({
+          workerId: worker._id,
+          eventType: 'MILESTONE_JOBS_COMPLETED',
+          points: settings.points.jobMilestoneBonus,
+          reason: `Completed ${newCount} jobs — milestone reward`,
+          bookingId: booking._id,
+          metadata: { completedCount: newCount },
+          silent: true,
+        })
+      );
+    }
+    if (onTime) {
+      extras.push(
+        await applyScoreChange({
+          workerId: worker._id,
+          eventType: 'ON_TIME',
+          points: settings.points.onTime,
+          reason: `Completed job ${booking.bookingNumber} on time`,
+          bookingId: booking._id,
+          counterField: 'onTimeCount',
+        })
+      );
+    }
   }
   return { completed, extras };
+};
+
+/**
+ * Collaboration completed → every 5 completed collaborations earns the
+ * collaborator a MILESTONE_COLLABS_COMPLETED bonus. Uses the worker's
+ * collaborationsCount (worker profile) which completeTeam has already bumped.
+ */
+const handleCollaborationCompleted = async (workerId, bookingId) => {
+  const settings = await getSettings();
+  const worker = await Worker.findById(workerId).select('collaborationsCount').lean();
+  const count = worker?.collaborationsCount || 0;
+  if (count === 0 || count % 5 !== 0) return { skipped: true };
+  return applyScoreChange({
+    workerId,
+    eventType: 'MILESTONE_COLLABS_COMPLETED',
+    points: settings.points.collabMilestoneBonus,
+    reason: `Completed ${count} collaborations — milestone reward`,
+    bookingId,
+    metadata: { collaborationsCount: count },
+    silent: true,
+  });
 };
 
 /**
@@ -546,6 +584,7 @@ module.exports = {
   handleJobCompleted,
   handleGoodRating,
   handleCollaboration,
+  handleCollaborationCompleted,
   handleCancelledAfterAccept,
   handleLateArrival,
   recordCheckIn,

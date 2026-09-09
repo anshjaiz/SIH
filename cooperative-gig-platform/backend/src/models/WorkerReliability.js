@@ -39,6 +39,10 @@ const workerReliabilitySchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    collabNoShowCount: {
+      type: Number,
+      default: 0,
+    },
     completedCount: {
       type: Number,
       default: 0,

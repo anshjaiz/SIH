@@ -63,9 +63,14 @@ const rankWorkersForBooking = async (bookingData, { limit = 10, blend = 0.5 } = 
   const { service, location, isEmergency } = bookingData;
   const model = await loadModel();
 
+  // Strict skill eligibility (verified skill _id must match the job's required
+  // skills) is enforced at the DB level BEFORE any scoring or ranking.
+  const skillFilter = matching.skillEligibleQuery(service);
+
   const candidates = await Worker.find({
     isActive: true,
     verificationStatus: 'VERIFIED',
+    ...(skillFilter ? skillFilter : {}),
     location: { $near: { $geometry: { type: 'Point', coordinates: location }, $maxDistance: (isEmergency ? 15 : 30) * 1000 } },
   }).populate('user', 'name phone')
     .limit(50);

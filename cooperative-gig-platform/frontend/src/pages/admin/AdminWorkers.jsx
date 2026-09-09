@@ -49,6 +49,16 @@ export default function AdminWorkers() {
     }
   };
 
+  const handleSkillVerify = async (workerId, skillId, verified) => {
+    try {
+      await api.patch(`/admin/workers/${workerId}/skills/${skillId}`, { verified });
+      toast.success(`Skill ${verified ? 'verified' : 'unverified'}`);
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
   const statusColors = {
     PENDING: 'badge-warning', VERIFIED: 'badge-success', REJECTED: 'badge-danger', SUSPENDED: 'badge-danger',
   };
@@ -100,9 +110,15 @@ export default function AdminWorkers() {
                   <p className="text-sm text-gray-500">{w.user?.email}</p>
                   <p className="text-xs text-gray-400">{w.area}, {w.city}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {w.skills?.slice(0, 3).map((sk, i) => (
-                      <span key={i} className="text-xs bg-gray-100 px-2 py-0.5 rounded">{sk.name}</span>
+                    {(w.skills || []).slice(0, 5).map((sk) => (
+                      <span key={sk._id || sk.name} className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${sk.verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {sk.name}
+                        {sk.verified
+                          ? <button title="Unverify skill" className="hover:underline" onClick={() => handleSkillVerify(w._id, sk._id, false)}>✓</button>
+                          : <button title="Verify skill" className="hover:underline font-bold" onClick={() => handleSkillVerify(w._id, sk._id, true)}>verify</button>}
+                      </span>
                     ))}
+                    {(w.skills || []).length > 5 && <span className="text-xs text-gray-400">+{(w.skills.length - 5)} more</span>}
                   </div>
                 </div>
               </div>

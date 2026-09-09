@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import api from '../../services/api';
 import { createCollaborationRequest } from '../../services/collaboratorService';
 
 const ROLES = [
@@ -17,7 +18,6 @@ const STATUS_COLORS = {
 export default function RequestCollaboratorModal({ booking, open, onClose, onCreated }) {
   const [form, setForm] = useState({
     role: 'Helper',
-    requiredSkills: '',
     numberOfCollaborators: 1,
     date: '',
     startTime: '09:00',
@@ -25,20 +25,40 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
     estimatedPayment: 300,
     instructions: '',
   });
+  const [allSkills, setAllSkills] = useState([]);
+  const [selectedSkillIds, setSelectedSkillIds] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedSkillIds([]);
+      api.get('/services/skills/list')
+        .then((res) => setAllSkills(res.data || []))
+        .catch(() => setAllSkills([]));
+    }
+  }, [open]);
 
   if (!open || !booking) return null;
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
+  const toggleSkill = (id) =>
+    setSelectedSkillIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
   const submit = async () => {
     if (!form.date) return toast.error('Please select a collaboration date');
     setLoading(true);
     try {
+      const selectedNames = allSkills
+        .filter((s) => selectedSkillIds.includes(s._id))
+        .map((s) => s.name);
       const res = await createCollaborationRequest({
         bookingId: booking._id,
         role: form.role,
-        requiredSkills: form.requiredSkills ? form.requiredSkills.split(',').map((s) => s.trim()).filter(Boolean) : [],
+        requiredSkills: selectedNames,
+        requiredSkillIds: selectedSkillIds,
         numberOfCollaborators: Number(form.numberOfCollaborators),
         date: form.date,
         startTime: form.startTime,
@@ -75,8 +95,22 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
               </select>
             </div>
             <div className="col-span-2">
-              <label className="label">Required skills (comma separated, optional)</label>
-              <input className="input-field" placeholder="e.g. Plumbing, Pipe fitting" value={form.requiredSkills} onChange={set('requiredSkills')} />
+              <label className="label">Required skills (tap to select, optional)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {allSkills.map((s) => (
+                  <button
+                    key={s._id}
+                    type="button"
+                    onClick={() => toggleSkill(s._id)}
+                    className={`text-xs px-2.5 py-1 rounded-full border ${selectedSkillIds.includes(s._id) ? 'bg-brand-600 text-white border-brand-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-brand-400'}`}
+                  >
+                    {s.name} {selectedSkillIds.includes(s._id) ? '✓' : ''}
+                  </button>
+                ))}
+              </div>
+              {selectedSkillIds.length === 0 && (
+                <p className="text-[11px] text-gray-400 mt-1">No skills chosen → matched by collaborator role only.</p>
+              )}
             </div>
             <div>
               <label className="label">Team size</label>
@@ -111,7 +145,7 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
             </button>
           </div>
           <p className="text-[11px] text-gray-400 mt-3">
-            Fair-work matching: only verified workers with matching skills near the job are invited.
+            Fair-work matching: only verified workers with a matching verified skill near the job are invited.
           </p>
         </div>
       </div>

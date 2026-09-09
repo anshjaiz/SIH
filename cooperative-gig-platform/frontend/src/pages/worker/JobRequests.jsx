@@ -68,6 +68,14 @@ export default function JobRequests() {
                   <h3 className="font-semibold">{job.serviceSnapshot?.name}</h3>
                   <p className="text-sm text-gray-500">{job.bookingNumber} • {job.serviceSnapshot?.category}</p>
                   {job.isEmergency && <span className="badge bg-orange-100 text-orange-700 mt-1">⚡ EMERGENCY</span>}
+                  {job.requiredSkillNames?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className="text-xs text-gray-400">Required:</span>
+                      {job.requiredSkillNames.map((s, i) => (
+                        <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">🎯 {s}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-brand-600">₹{job.priceBreakdown?.total}</p>

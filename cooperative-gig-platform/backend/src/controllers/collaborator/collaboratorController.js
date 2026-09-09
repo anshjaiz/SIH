@@ -30,7 +30,7 @@ const createCollaborationRequest = asyncHandler(async (req, res) => {
   const workerId = await getWorkerId(req.user._id);
   if (!workerId) throw new ApiError('Worker profile not found', 404);
 
-  const { bookingId, role, requiredSkills, numberOfCollaborators, date, startTime, durationHours, address, city, estimatedPayment, instructions } = req.body;
+  const { bookingId, role, requiredSkills, requiredSkillIds, numberOfCollaborators, date, startTime, durationHours, address, city, estimatedPayment, instructions } = req.body;
 
   if (!bookingId) throw new ApiError('bookingId is required', 400);
   if (!role) throw new ApiError('Collaborator role is required', 400);
@@ -57,6 +57,7 @@ const createCollaborationRequest = asyncHandler(async (req, res) => {
   const payload = {
     role,
     requiredSkills: Array.isArray(requiredSkills) ? requiredSkills : [],
+    requiredSkillIds: Array.isArray(requiredSkillIds) ? requiredSkillIds : [],
     numberOfCollaborators: count,
     date: new Date(date),
     location,
@@ -71,6 +72,7 @@ const createCollaborationRequest = asyncHandler(async (req, res) => {
     leadWorker: workerId,
     role,
     requiredSkills: payload.requiredSkills,
+    requiredSkillIds: payload.requiredSkillIds,
     numberOfCollaborators: count,
     date: payload.date,
     startTime: startTime || '09:00',

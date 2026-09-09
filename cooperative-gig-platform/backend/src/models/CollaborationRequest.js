@@ -34,6 +34,11 @@ const collaborationRequestSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    requiredSkillIds: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'Skill',
+      default: [],
+    },
     numberOfCollaborators: {
       type: Number,
       default: 1,

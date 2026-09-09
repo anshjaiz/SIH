@@ -54,6 +54,8 @@ const createServiceRequest = asyncHandler(async (req, res) => {
       basePrice: service.basePrice,
       unit: service.unit,
     },
+    requiredSkillIds: service.requiredSkillRefs || [],
+    requiredSkillNames: service.requiredSkills || [],
     description,
     problemImages: req.files ? req.files.map((f) => f.path) : [],
     location: {

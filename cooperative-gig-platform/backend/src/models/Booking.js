@@ -29,6 +29,16 @@ const bookingSchema = new mongoose.Schema(
       basePrice: Number,
       unit: String,
     },
+    // Required skills snapshot (strict skillId-based eligibility of workers)
+    requiredSkillIds: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'Skill',
+      default: [],
+    },
+    requiredSkillNames: {
+      type: [String],
+      default: [],
+    },
     description: {
       type: String,
       default: '',

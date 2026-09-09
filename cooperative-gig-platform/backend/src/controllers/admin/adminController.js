@@ -10,6 +10,7 @@ const Service = require('../../models/Service');
 const Notification = require('../../models/Notification');
 const Cooperative = require('../../models/Cooperative');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
+const { refreshWorkerEligibility } = require('../../services/matching/matchingService');
 
 // -------------------- Admin Dashboard --------------------
 
@@ -194,6 +195,10 @@ const updateWorkerStatus = asyncHandler(async (req, res) => {
   );
   if (!worker) throw new ApiError('Worker not found', 404);
 
+  refreshWorkerEligibility(worker._id).catch((err) =>
+    console.error('refreshWorkerEligibility error:', err)
+  );
+
   // Notify worker
   await Notification.create({
     user: worker.user,
@@ -204,6 +209,48 @@ const updateWorkerStatus = asyncHandler(async (req, res) => {
   });
 
   res.json({ success: true, message: `Worker status updated to ${status}`, data: worker });
+});
+
+// Verify / unverify a single worker skill (strict skill eligibility gate)
+const updateWorkerSkillVerification = asyncHandler(async (req, res) => {
+  const { verified } = req.body;
+  if (typeof verified !== 'boolean') {
+    throw new ApiError('verified must be a boolean', 400);
+  }
+
+  const worker = await Worker.findById(req.params.id);
+  if (!worker) throw new ApiError('Worker not found', 404);
+
+  const skillSubDoc = worker.skills.id(req.params.skillId);
+  if (!skillSubDoc) throw new ApiError('Skill not found on worker', 404);
+
+  skillSubDoc.verified = verified;
+  skillSubDoc.verifiedAt = verified ? new Date() : null;
+  await worker.save();
+
+  // Re-evaluate all open MATCHING bookings for this worker — add if newly
+  // eligible, remove if no longer eligible.  Fire-and-forget so the admin
+  // response isn't delayed by the (potentially heavy) re-match.
+  refreshWorkerEligibility(worker._id).catch((err) =>
+    console.error('refreshWorkerEligibility error:', err)
+  );
+
+  // Notify worker
+  await Notification.create({
+    user: worker.user,
+    type: 'SYSTEM',
+    title: verified ? 'Skill verified' : 'Skill verification revoked',
+    message: `Your skill "${skillSubDoc.name || 'skill'}" was ${
+      verified ? 'verified' : 'marked unverified'
+    } by the admin.`,
+    data: { workerId: worker._id, skillId: req.params.skillId, verified },
+  });
+
+  res.json({
+    success: true,
+    message: `Skill "${skillSubDoc.name || ''}" ${verified ? 'verified' : 'unverified'}`,
+    data: worker,
+  });
 });
 
 // -------------------- Certificate Verification --------------------
@@ -432,6 +479,7 @@ module.exports = {
   getWorkers,
   getWorkerDetail,
   updateWorkerStatus,
+  updateWorkerSkillVerification,
   getCertificates,
   reviewCertificate,
   getCustomers,

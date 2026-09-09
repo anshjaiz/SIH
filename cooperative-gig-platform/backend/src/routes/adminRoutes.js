@@ -5,6 +5,7 @@ const {
   getWorkers,
   getWorkerDetail,
   updateWorkerStatus,
+  updateWorkerSkillVerification,
   getCertificates,
   reviewCertificate,
   getCustomers,
@@ -53,6 +54,7 @@ router.get('/heatmap', getDemandHeatmap);
 router.get('/workers', getWorkers);
 router.get('/workers/:id', getWorkerDetail);
 router.put('/workers/:id/status', updateWorkerStatus);
+router.patch('/workers/:id/skills/:skillId', updateWorkerSkillVerification);
 
 // Certificates
 router.get('/certificates', getCertificates);

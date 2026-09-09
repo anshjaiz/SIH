@@ -50,6 +50,11 @@ const serviceSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    requiredSkillRefs: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: 'Skill',
+      default: [],
+    },
     emergencyAvailable: {
       type: Boolean,
       default: false,

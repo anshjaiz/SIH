@@ -5,6 +5,8 @@ import toast from 'react-hot-toast';
 export default function WorkerProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [allSkills, setAllSkills] = useState([]);
+  const [newSkillId, setNewSkillId] = useState('');
   const fileInputRef = useRef(null);
   const [form, setForm] = useState({
     bio: '', city: '', area: '', address: '', experienceYears: 0, serviceAreaRadiusKm: 15,
@@ -23,6 +25,8 @@ export default function WorkerProfile() {
           experienceYears: res.data.experienceYears || 0,
           serviceAreaRadiusKm: res.data.serviceAreaRadiusKm || 15,
         });
+        const skillsRes = await api.get('/services/skills/list');
+        setAllSkills(skillsRes.data || []);
       } catch (e) {
         console.error(e);
       }
@@ -42,13 +46,18 @@ export default function WorkerProfile() {
   };
 
   const handleAddSkill = async () => {
-    const skillName = prompt('Enter skill name:');
-    if (!skillName) return;
+    if (!newSkillId) return toast.error('Select a skill first');
+    const selected = allSkills.find((s) => s._id === newSkillId);
     try {
-      await api.post('/workers/skills', { name: skillName, yearsOfExperience: 1 });
-      toast.success('Skill added!');
+      await api.post('/workers/skills', {
+        skillId: newSkillId,
+        name: selected ? selected.name : '',
+        yearsOfExperience: 1,
+      });
+      toast.success('Skill added. It will match jobs only after admin verification.');
       const res = await api.get('/workers/profile');
       setProfile(res.data);
+      setNewSkillId('');
     } catch (err) {
       toast.error(err.message || 'Failed');
     }
@@ -140,14 +149,27 @@ export default function WorkerProfile() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">Skills</h3>
-          <button onClick={handleAddSkill} className="btn-primary text-sm">+ Add Skill</button>
+          <div className="flex gap-2">
+            <select className="input-field text-sm max-w-[200px]" value={newSkillId} onChange={(e) => setNewSkillId(e.target.value)}>
+              <option value="">Select skill…</option>
+              {allSkills
+                .filter((s) => !(profile?.skills || []).some((ps) => ps.skill === s._id || (ps.name || '').toLowerCase() === (s.name || '').toLowerCase()))
+                .map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+            </select>
+            <button onClick={handleAddSkill} className="btn-primary text-sm">+ Add</button>
+          </div>
         </div>
         {profile?.skills?.length > 0 ? (
           <div className="space-y-2">
-            {profile.skills.map((sk, i) => (
-              <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                <span className="text-sm font-medium">{sk.name}</span>
-                <span className="text-xs text-gray-500">{sk.yearsOfExperience} years</span>
+            {profile.skills.map((sk) => (
+              <div key={sk._id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{sk.name}</span>
+                  <span className="text-xs text-gray-500">{sk.yearsOfExperience} years</span>
+                </div>
+                <span className={`badge ${sk.verified ? 'badge-success' : 'badge-warning'}`}>
+                  {sk.verified ? '✓ Verified' : '⏳ Pending approval'}
+                </span>
               </div>
             ))}
           </div>

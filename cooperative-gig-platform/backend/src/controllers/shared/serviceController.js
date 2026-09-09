@@ -1,6 +1,7 @@
 const Service = require('../../models/Service');
 const Skill = require('../../models/Skill');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
+const { syncServiceSkillRefs } = require('../../utils/skillUtils');
 
 // @desc    Get all active services
 // @route   GET /api/services
@@ -101,6 +102,11 @@ const createService = asyncHandler(async (req, res) => {
     icon,
   });
 
+  // Resolve the canonical skill _ids from the skill names/category so the
+  // backend can apply the strict ID-based skill eligibility gate.
+  await syncServiceSkillRefs(service);
+  await service.save();
+
   res.status(201).json({ success: true, message: 'Service created', data: service });
 });
 
@@ -132,6 +138,7 @@ const updateService = asyncHandler(async (req, res) => {
     }
   });
 
+  await syncServiceSkillRefs(service);
   await service.save();
 
   res.json({ success: true, message: 'Service updated', data: service });

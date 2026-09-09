@@ -19,8 +19,15 @@ const Worker = require('../../models/WorkerProfile');
 const Booking = require('../../models/Booking');
 const WorkerAvailability = require('../../models/WorkerAvailability');
 const Skill = require('../../models/Skill');
+const Service = require('../../models/Service');
 const Cooperative = require('../../models/Cooperative');
+const Notification = require('../../models/Notification');
 const { haversineDistance, estimateTravelMinutes } = require('../../utils/geoUtils');
+const { getIO } = require('../../config/socket');
+const {
+  hasEligibleSkill,
+  skillMatchPercent,
+} = require('../../utils/skillUtils');
 
 // Default weights (overridable from cooperative config)
 const DEFAULT_WEIGHTS = {
@@ -33,96 +40,24 @@ const DEFAULT_WEIGHTS = {
 };
 
 /**
- * Alias mapping so related skills surface the right jobs
- * (e.g. "Electrician" counts toward Refrigerator Repair / Appliance Repair).
- * Keys are required skill names (lowercased), values are related skill words.
+ * Mongo query fragment enforcing the STRICT skill eligibility gate at DB level.
+ * A worker qualifies only when a SINGLE skill subdocument is (a) admin-verified
+ * and (b) its skill _id is one of the job's required skills. No substring or
+ * alias matching — stable identifiers only.
  */
-const SKILL_ALIASES = {
-  'appliance repair': ['appliance', 'refrigerator', 'fridge', 'washing machine', 'ac', 'air conditioner', 'electrician', 'electrical', 'dishwasher', 'microwave', 'oven'],
-  'carpentry': ['carpenter', 'wood', 'carpentry', 'furniture', 'cabinet', 'joinery'],
-  'cleaning': ['clean', 'maid', 'housekeeping', 'domestic help', 'housemaid'],
-  'plumbing': ['plumber', 'plumbing', 'pipe', 'sanitary', 'water heater', 'tap'],
-  'electrical': ['electrician', 'electrical', 'wiring', 'inverter', 'fan', 'switch'],
-  'gardening': ['garden', 'lawn', 'landscaping', 'gardener', 'horticulture'],
-  'driving': ['driver', 'driving', 'shifting', 'transport'],
-  'painting': ['painter', 'paint', 'wall'],
-  'caregiving': ['caregiver', 'care giving', 'nursing', 'nurse', 'elderly', 'patient'],
-  'domestic help': ['clean', 'maid', 'housekeeping', 'cook', 'domestic'],
-};
-
-const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/**
- * Check if a worker skill (lowercased) counts toward a required skill.
- * Uses exact/substring match plus alias expansion.
- */
-const skillMatches = (workerSkill, reqSkill) => {
-  const ws = (workerSkill || '').toLowerCase();
-  const rq = (reqSkill || '').toLowerCase();
-  if (!ws) return false;
-  if (ws.includes(rq) || rq.includes(ws)) return true;
-
-  // Split both into tokens ("refrigerator repair" -> refrigerator/repair)
-  const wsTokens = ws.split(/[\s,/-]+/);
-  const rqTokens = rq.split(/[\s,/-]+/);
-  for (const w of wsTokens) {
-    if (w.length >= 3 && rqTokens.some((r) => r.length >= 3 && (r.includes(w) || w.includes(r)))) {
-      return true;
-    }
-  }
-
-  // Alias expansion
-  const aliases = SKILL_ALIASES[rq];
-  if (aliases) {
-    for (const word of aliases) {
-      if (word.endsWith('*')) {
-        if (new RegExp(word.slice(0, -1), 'i').test(ws)) return true;
-        continue;
-      }
-      if (ws.includes(word)) return true;
-      const tokens = word.split(' ');
-      for (const t of tokens) {
-        if (t.length >= 3 && new RegExp(`\\b${escRe(t)}`, 'i').test(ws)) {
-          return true;
-        }
-      }
-    }
-  }
-  return false;
+const skillEligibleQuery = (service) => {
+  const requiredSkillIds = (service && service.requiredSkillRefs) || [];
+  if (requiredSkillIds.length === 0) return null;
+  return {
+    skills: { $elemMatch: { skill: { $in: requiredSkillIds }, verified: true } },
+  };
 };
 
 /**
- * Calculate skill match score (0-100)
- * @param {Object} worker - worker profile
- * @param {Object} service - service being requested
+ * Required skill ids (as strings) for a service.
  */
-const skillMatchScore = (worker, service) => {
-  if (!service || !service.requiredSkills || service.requiredSkills.length === 0) {
-    return 100; // no specific skills required, all match
-  }
-
-  const workerSkills = (worker.skills || []).map((s) => s.name || '');
-
-  let matched = 0;
-  service.requiredSkills.forEach((reqSkill) => {
-    if (workerSkills.some((ws) => skillMatches(ws, reqSkill))) {
-      matched++;
-    }
-  });
-
-  // Also check category match
-  const category = service.category || '';
-  const categoryMatches = worker.skills.some((s) =>
-    skillMatches(s.name || '', category)
-  );
-
-  const skillMatchPercent = (matched / service.requiredSkills.length) * 100;
-
-  // Combine: 70% skill names, 30% category
-  let score = skillMatchPercent * 0.7 + (categoryMatches ? 30 : 0);
-
-  return Math.round(Math.min(score, 100));
-};
+const requiredSkillIdList = (service) =>
+  ((service && service.requiredSkillRefs) || []).map(String);
 
 /**
  * Calculate distance score (0-100)
@@ -250,6 +185,14 @@ const workloadScore = async (worker, now = new Date()) => {
 };
 
 /**
+ * Calculate skill match score (0-100) based ONLY on stable skill _ids.
+ * A worker needs at least one admin-verified skill whose _id is one of the
+ * service's required skill refs. No substring/alias matching.
+ */
+const skillMatchScore = (worker, service) =>
+  skillMatchPercent(worker, requiredSkillIdList(service));
+
+/**
  * Compute full match score for a worker against a booking request
  * @returns { { score, breakdown, reasons } }
  */
@@ -364,12 +307,19 @@ const matchWorkersForBooking = async (bookingData, limit = 5) => {
     // use defaults
   }
 
+  // Required skill ids for this job (stable identifiers)
+  const requiredSkillIds = requiredSkillIdList(service);
+
   // Find candidate workers
   // Location + radius gate: only workers within the service radius qualify.
   // Emergency jobs use a tighter 15 km radius.
+  // Skill gate (STRICT): a worker must have a VERIFIED skill _id matching the
+  // job's required skills — applied at the DB level, before any scoring.
+  const skillFilter = skillEligibleQuery(service);
   const candidateWorkers = await Worker.find({
     isActive: true,
     verificationStatus: 'VERIFIED',
+    ...(skillFilter ? skillFilter : {}),
     location: {
       $near: {
         $geometry: { type: 'Point', coordinates: location },
@@ -386,10 +336,9 @@ const matchWorkersForBooking = async (bookingData, limit = 5) => {
   const scored = [];
   for (const worker of candidateWorkers) {
     const result = await computeWorkerMatchScore(worker, bookingData, weights);
-    // STRICT SKILL GATE: only workers whose skills match this service qualify.
-    // A worker must match at least one required skill (breakdown.skill is the
-    // 0-100 skill component; >=30 means at least a partial/category match).
-    if (result.breakdown.skill < 30) continue;
+    // Strict skill gate (defense-in-depth — the DB filter already excluded
+    // non-eligible workers).
+    if (!hasEligibleSkill(worker, requiredSkillIds) || result.breakdown.skill < 30) continue;
     scored.push({
       worker: worker._id,
       score: result.score,
@@ -405,14 +354,214 @@ const matchWorkersForBooking = async (bookingData, limit = 5) => {
   return scored.slice(0, limit);
 };
 
+/**
+ * Re-evaluate a single worker against ALL open MATCHING bookings.
+ *
+ * Called when eligibility changes (skill verified/unverified, profile
+ * verification status changes, skills added/removed). For each open booking:
+ *   - If the worker is now eligible but NOT a candidate → re-match, insert,
+ *     send NEW_JOB notification + socket event.
+ *   - If the worker was a candidate but is no longer eligible → remove.
+ */
+const refreshWorkerEligibility = async (workerId) => {
+  const worker = await Worker.findById(workerId);
+  if (!worker) return { reassessed: 0, added: [], removed: [] };
+
+  const isProfileEligible =
+    worker.isActive && worker.verificationStatus === 'VERIFIED';
+
+  const openBookings = await Booking.find({ status: 'MATCHING' });
+  const added = [];
+  const removed = [];
+
+  for (const booking of openBookings) {
+    const service = await Service.findById(booking.service);
+    if (!service) continue;
+
+    const requiredSkillIds = requiredSkillIdList(service);
+    const wasCandidate = booking.candidateWorkers.some(
+      (c) => c.worker.toString() === workerId.toString()
+    );
+
+    const isEligibleForBooking =
+      isProfileEligible &&
+      (requiredSkillIds.length === 0 ||
+        hasEligibleSkill(worker, requiredSkillIds));
+
+    if (isEligibleForBooking && !wasCandidate) {
+      const candidates = await matchWorkersForBooking(
+        {
+          service,
+          location: booking.location?.coordinates,
+          requestedDate: booking.requestedDate,
+          isEmergency: booking.isEmergency,
+          city: booking.city,
+        },
+        booking.isEmergency ? 3 : 10
+      );
+
+      const thisWorkerResult = candidates.find(
+        (c) => c.worker.toString() === workerId.toString()
+      );
+      if (!thisWorkerResult) continue;
+
+      booking.candidateWorkers.push({
+        worker: thisWorkerResult.worker,
+        score: thisWorkerResult.score,
+        reasons: thisWorkerResult.reasons,
+      });
+      booking.candidateWorkers.sort((a, b) => b.score - a.score);
+      const cap = booking.isEmergency ? 3 : 10;
+      booking.candidateWorkers = booking.candidateWorkers.slice(0, cap);
+      await booking.save();
+
+      const existingNotif = await Notification.findOne({
+        user: worker.user,
+        type: 'NEW_JOB',
+        'data.bookingId': booking._id,
+      });
+      if (!existingNotif) {
+        await Notification.create({
+          user: worker.user,
+          type: 'NEW_JOB',
+          title: 'New job available',
+          message: `${booking.isEmergency ? '⚠️ EMERGENCY: ' : ''}${service.name} job in your area. Match score ${thisWorkerResult.score}/100.`,
+          data: { bookingId: booking._id, score: thisWorkerResult.score },
+        });
+      }
+
+      const io = getIO();
+      if (io) {
+        io.to(`worker_${workerId}`).emit('new_job', {
+          bookingId: booking._id,
+          bookingNumber: booking.bookingNumber,
+          serviceName: service.name,
+          isEmergency: booking.isEmergency,
+          score: thisWorkerResult.score,
+        });
+      }
+
+      added.push({
+        bookingId: booking._id,
+        bookingNumber: booking.bookingNumber,
+      });
+    } else if (!isEligibleForBooking && wasCandidate) {
+      booking.candidateWorkers = booking.candidateWorkers.filter(
+        (c) => c.worker.toString() !== workerId.toString()
+      );
+      await booking.save();
+      removed.push({
+        bookingId: booking._id,
+        bookingNumber: booking.bookingNumber,
+      });
+    }
+  }
+
+  return { reassessed: openBookings.length, added, removed };
+};
+
+/**
+ * One-off: re-match ALL open MATCHING bookings from scratch.
+ * Used to fix stale bookings where the candidate list was snapshotted
+ * before skills were verified.
+ */
+const rematchAllOpenBookings = async () => {
+  const openBookings = await Booking.find({ status: 'MATCHING' });
+  let totalNewCandidates = 0;
+
+  for (const booking of openBookings) {
+    const service = await Service.findById(booking.service);
+    if (!service) continue;
+
+    const candidates = await matchWorkersForBooking(
+      {
+        service,
+        location: booking.location?.coordinates,
+        requestedDate: booking.requestedDate,
+        isEmergency: booking.isEmergency,
+        city: booking.city,
+      },
+      booking.isEmergency ? 3 : 10
+    );
+
+    const prevIds = new Set(
+      booking.candidateWorkers.map((c) => c.worker.toString())
+    );
+    booking.candidateWorkers = candidates.map((c) => ({
+      worker: c.worker,
+      score: c.score,
+      reasons: c.reasons,
+    }));
+    await booking.save();
+
+    const newCandidates = candidates.filter(
+      (c) => !prevIds.has(c.worker.toString())
+    );
+    if (newCandidates.length) {
+      const workerIds = newCandidates.map((c) => c.worker);
+      const workers = await Worker.find({ _id: { $in: workerIds } }).select(
+        'user'
+      );
+      const userById = new Map(
+        workers.map((w) => [w._id.toString(), w.user])
+      );
+
+      for (const c of newCandidates) {
+        const userId = userById.get(c.worker.toString());
+        if (userId) {
+          const existingNotif = await Notification.findOne({
+            user: userId,
+            type: 'NEW_JOB',
+            'data.bookingId': booking._id,
+          });
+          if (!existingNotif) {
+            await Notification.create({
+              user: userId,
+              type: 'NEW_JOB',
+              title: 'New job available',
+              message: `${booking.isEmergency ? '⚠️ EMERGENCY: ' : ''}${service.name} job in your area. Match score ${c.score}/100.`,
+              data: { bookingId: booking._id, score: c.score },
+            });
+          }
+        }
+      }
+
+      const io = getIO();
+      if (io) {
+        for (const c of newCandidates) {
+          io.to(`worker_${c.worker}`).emit('new_job', {
+            bookingId: booking._id,
+            bookingNumber: booking.bookingNumber,
+            serviceName: service.name,
+            isEmergency: booking.isEmergency,
+            score: c.score,
+          });
+        }
+      }
+    }
+
+    totalNewCandidates += newCandidates.length;
+  }
+
+  return {
+    bookingsReprocessed: openBookings.length,
+    newCandidatesAdded: totalNewCandidates,
+  };
+};
+
 module.exports = {
   matchWorkersForBooking,
   computeWorkerMatchScore,
   skillMatchScore,
+  skillEligibleQuery,
+  requiredSkillIdList,
+  hasEligibleSkill,
   distanceScore,
   availabilityScore,
   ratingScore,
   experienceScore,
   workloadScore,
   DEFAULT_WEIGHTS,
+  refreshWorkerEligibility,
+  rematchAllOpenBookings,
 };

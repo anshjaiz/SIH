@@ -25,7 +25,11 @@ const {
   haversineDistance,
 } = require('../../utils/geoUtils');
 const {
-  skillMatchScore,
+  skillMatchPercent,
+  hasEligibleSkill,
+} = require('../../utils/skillUtils');
+
+const {
   distanceScore,
   availabilityScore,
   ratingScore,
@@ -89,6 +93,31 @@ const roleSkillGroup = (role, requiredSkills = []) => {
 };
 
 /**
+ * Role-keyword skill score (used for collaboration roles only, where the lead
+ * chose a free-form role instead of stable skill ids). Matches against the
+ * worker's skill NAMES via explicit role keywords. Not used for customer job
+ * eligibility.
+ */
+const roleKeywordMatchScore = (worker, keywords = []) => {
+  if (keywords.length === 0) return 60;
+  const names = (worker.skills || []).map((s) => String(s.name || '').toLowerCase());
+  if (names.length === 0) return 0;
+  const hit = keywords.some((k) => {
+    const kb = String(k).toLowerCase();
+    if (!kb) return false;
+    return names.some((n) => n.includes(kb) || kb.includes(n));
+  });
+  return hit ? 100 : 20;
+};
+
+/**
+ * Strict skill score when the lead worker selected skills by stable _id.
+ * Only admin-verified skills qualify.
+ */
+const skillIdMatchScore = (worker, requiredSkillIds = []) =>
+  skillMatchPercent(worker, requiredSkillIds);
+
+/**
  * Score a single candidate worker against a collaboration request.
  * @returns {Promise<{score, reasons, breakdown, distanceKm}>}
  */
@@ -97,11 +126,19 @@ const computeCollaboratorScore = async (
   payload,
   weights = DEFAULT_COLLABORATION_WEIGHTS
 ) => {
-  const { role, requiredSkills, location, date } = payload;
+  const { role, requiredSkills, requiredSkillIds, location, date } = payload;
 
-  // --- Skill: pseudo-service shape reuses the main skill matcher ---
-  const pseudoService = { requiredSkills: roleSkillGroup(role, requiredSkills), category: role };
-  const skill = skillMatchScore(worker, pseudoService);
+  // --- Skill: strict when skill ids given, otherwise role-keyword matching ---
+  const skillIds = Array.isArray(requiredSkillIds) ? requiredSkillIds : [];
+  let skill;
+  if (skillIds.length > 0) {
+    skill = skillIdMatchScore(worker, skillIds);
+  } else {
+    const pseudoService = { requiredSkills: roleSkillGroup(role, requiredSkills), category: role };
+    // Pseudo-service has no requiredSkillRefs, so the ID-based matcher would
+    // return 100 for everyone — use role keywords explicitly here.
+    skill = roleKeywordMatchScore(worker, pseudoService.requiredSkills);
+  }
   const skillReason =
     skill >= 80
       ? `Strong skill match for ${role}`
@@ -176,7 +213,13 @@ const computeCollaboratorScore = async (
  */
 const findCollaboratorCandidates = async (payload, limit = 10) => {
   const weights = await loadWeights();
-  const { location, numberOfCollaborators = 1, leadWorkerId, excludeWorkerIds = [] } = payload;
+  const { location, numberOfCollaborators = 1, leadWorkerId, excludeWorkerIds = [], requiredSkillIds = [] } = payload;
+
+  // Strict skill gate when the lead picked stable skill ids: only workers with
+  // an admin-verified matching skill _id enter the pool.
+  const skillFilter = requiredSkillIds.length
+    ? { skills: { $elemMatch: { skill: { $in: requiredSkillIds }, verified: true } } }
+    : null;
 
   // Prioritize nearby verified workers; fall back if the pool is too small so
   // a skilled candidate is never hidden purely by distance.
@@ -184,6 +227,7 @@ const findCollaboratorCandidates = async (payload, limit = 10) => {
     isActive: true,
     verificationStatus: 'VERIFIED',
     _id: { $nin: [leadWorkerId, ...excludeWorkerIds].filter(Boolean) },
+    ...(skillFilter ? skillFilter : {}),
     location: {
       $near: {
         $geometry: { type: 'Point', coordinates: location },
@@ -196,7 +240,10 @@ const findCollaboratorCandidates = async (payload, limit = 10) => {
   for (const worker of pool) {
     const result = await computeCollaboratorScore(worker, { ...payload, leadWorkerId }, weights);
     // Skill is a hard gate: only genuinely relevant workers are offered.
-    if (result.breakdown.skill < 30) continue;
+    const skillIdsOk = requiredSkillIds.length
+      ? hasEligibleSkill(worker, requiredSkillIds)
+      : result.breakdown.skill >= 30;
+    if (!skillIdsOk) continue;
     scored.push({ worker: worker._id, score: result.score, reasons: result.reasons, breakdown: result.breakdown, distanceKm: result.distanceKm });
   }
 
@@ -210,5 +257,7 @@ module.exports = {
   findCollaboratorCandidates,
   computeCollaboratorScore,
   roleSkillGroup,
+  roleKeywordMatchScore,
+  skillIdMatchScore,
   loadWeights,
 };

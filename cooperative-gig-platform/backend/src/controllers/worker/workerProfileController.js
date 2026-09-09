@@ -6,6 +6,7 @@ const WorkerAvailability = require('../../models/WorkerAvailability');
 const Notification = require('../../models/Notification');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const syncWorkerLocation = require('../../utils/syncWorkerLocation');
+const { refreshWorkerEligibility } = require('../../services/matching/matchingService');
 
 // -------------------- Worker profile --------------------
 
@@ -89,17 +90,26 @@ const addSkill = asyncHandler(async (req, res) => {
 
   // Avoid duplicates
   const exists = worker.skills.some(
-    (s) => (s.name || '').toLowerCase() === skillName.toLowerCase()
+    (s) =>
+      (s.name || '').toLowerCase() === skillName.toLowerCase() ||
+      (skillId && s.skill && String(s.skill) === String(skillId))
   );
   if (exists) throw new ApiError('Skill already added', 400);
 
   worker.skills.push({
     skill: skillId,
     name: skillName,
+    // New skills are NOT auto-eligible: an admin must verify the skill before
+    // the worker is matched for jobs requiring it.
+    verified: false,
     yearsOfExperience: yearsOfExperience || 0,
   });
 
   await worker.save();
+
+  // Re-evaluate open MATCHING bookings (defensive — new skills start unverified
+  // so this is usually a no-op, but covers edge cases).
+  refreshWorkerEligibility(worker._id).catch(() => {});
 
   res.status(201).json({ success: true, message: 'Skill added', data: worker });
 });
@@ -112,6 +122,9 @@ const removeSkill = asyncHandler(async (req, res) => {
     (s) => s._id.toString() !== req.params.skillId
   );
   await worker.save();
+
+  // Re-evaluate open MATCHING bookings — worker may lose eligibility
+  refreshWorkerEligibility(worker._id).catch(() => {});
 
   res.json({ success: true, message: 'Skill removed', data: worker });
 });

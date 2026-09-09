@@ -44,6 +44,12 @@ const workerProfileSchema = new mongoose.Schema(
           ref: 'Skill',
         },
         name: String, // denormalized for quick display
+        // Admin-approved skill. Only verified skills qualify for job matching.
+        verified: {
+          type: Boolean,
+          default: false,
+        },
+        verifiedAt: Date,
         yearsOfExperience: {
           type: Number,
           default: 0,
@@ -195,6 +201,7 @@ const workerProfileSchema = new mongoose.Schema(
 // Geospatial index for nearby worker queries
 workerProfileSchema.index({ location: '2dsphere' });
 workerProfileSchema.index({ 'skills.skill': 1 });
+workerProfileSchema.index({ 'skills.verified': 1 });
 workerProfileSchema.index({ verificationStatus: 1 });
 workerProfileSchema.index({ city: 1 });
 

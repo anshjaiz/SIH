@@ -75,6 +75,7 @@ const SKILL_NAMES = [
   'Plumbing', 'Electrical Wiring', 'Carpentry', 'Painting', 'Cleaning',
   'Gardening', 'Driving', 'Appliance Repair', 'Domestic Help', 'Caregiving',
   'Basic Plumbing', 'Advanced Electrical', 'CCTV Installation', 'Solar Panel Installation',
+  'AC Repair', 'HVAC Technician', 'Refrigerator Repair', 'Washing Machine Repair',
 ];
 
 const ADMIN = {
@@ -174,6 +175,10 @@ const SEED = async () => {
         emergencyAvailable: s.emergency,
         isActive: true,
       });
+      // Resolve canonical skill _ids used for the strict skill matching gate.
+      const { syncServiceSkillRefs } = require('./skillUtils');
+      await syncServiceSkillRefs(service);
+      await service.save();
       services.push(service);
     }
     console.log(`✓ Created ${services.length} services`);
@@ -277,6 +282,8 @@ const SEED = async () => {
           workerSkills.push({
             skill: skill._id,
             name: skillName,
+            verified: true, // seeded skills start verified
+            verifiedAt: new Date(),
             yearsOfExperience: (i % 15) + 1,
           });
         }
@@ -288,6 +295,8 @@ const SEED = async () => {
         workerSkills.push({
           skill: secondarySkill._id,
           name: secondarySkill.name,
+          verified: true,
+          verifiedAt: new Date(),
           yearsOfExperience: (i % 5) + 1,
         });
       }
@@ -390,6 +399,8 @@ const SEED = async () => {
           basePrice: labour,
           unit: 'per visit',
         },
+        requiredSkillIds: si.requiredSkillRefs || [],
+        requiredSkillNames: si.requiredSkills || [],
         description: `Need ${si.name.toLowerCase()} service at my place`,
         problemImages: [],
         location: { type: 'Point', coordinates: [loc.lng, loc.lat] },

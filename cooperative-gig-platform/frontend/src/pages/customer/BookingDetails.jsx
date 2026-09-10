@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../services/api';
 import MapComponent from '../../components/MapComponent';
+import ChatPanel from '../../components/ChatPanel';
 import { getSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
 import { COMPLAINT_CATEGORIES, PREFERRED_RESOLUTIONS } from '../../utils/complaints';
 
 const TRACKING_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
+
+// A valid [lng, lat] pair — empty arrays (worker hasn't shared a location) are NOT a location.
+const isValidCoords = (c) =>
+  Array.isArray(c) &&
+  c.length === 2 &&
+  typeof c[0] === 'number' &&
+  typeof c[1] === 'number' &&
+  Number.isFinite(c[0]) &&
+  Number.isFinite(c[1]);
 
 const haversineKm = (coords, coords2) => {
   const [lng1, lat1] = coords;
@@ -30,12 +40,16 @@ export default function BookingDetails() {
   const [complaintForm, setComplaintForm] = useState({ category: '', description: '', preferredResolution: 'FULL_REFUND' });
   const [complaintFiles, setComplaintFiles] = useState([]);
   const [filingComplaint, setFilingComplaint] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const chatEnabled = !!booking && !!booking.worker &&
+    ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.status);
 
   const load = async () => {
     try {
       const res = await api.get(`/customers/bookings/${id}`);
       setBooking(res.data);
-      if (res.data.workerLocation?.coordinates) {
+      if (isValidCoords(res.data.workerLocation?.coordinates)) {
         setWorkerLocation(res.data.workerLocation.coordinates);
         setSyncedAt(new Date());
       }
@@ -54,7 +68,7 @@ export default function BookingDetails() {
     const poll = async () => {
       try {
         const res = await api.get(`/customers/bookings/${id}`);
-        if (res.data.workerLocation?.coordinates) {
+        if (isValidCoords(res.data.workerLocation?.coordinates)) {
           setWorkerLocation(res.data.workerLocation.coordinates);
           setSyncedAt(new Date());
         }
@@ -70,7 +84,7 @@ export default function BookingDetails() {
     const socket = getSocket();
     if (!socket) return;
     const handler = (d) => {
-      if (d.bookingId === id && d.coordinates) {
+      if (d.bookingId === id && isValidCoords(d.coordinates)) {
         setWorkerLocation(d.coordinates);
         setSyncedAt(new Date());
       }
@@ -485,6 +499,17 @@ export default function BookingDetails() {
             </form>
           </div>
         </div>
+      )}
+      {chatEnabled && (
+        <>
+          <button
+            onClick={() => setChatOpen(true)}
+            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-brand-600 px-5 py-3 text-white shadow-lg hover:bg-brand-700 transition"
+          >
+            <span>💬</span> Message worker
+          </button>
+          <ChatPanel bookingId={id} open={chatOpen} onClose={() => setChatOpen(false)} bookingNumber={booking.bookingNumber} />
+        </>
       )}
     </div>
   );

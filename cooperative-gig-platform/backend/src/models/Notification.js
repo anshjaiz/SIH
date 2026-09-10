@@ -45,6 +45,7 @@ const notificationSchema = new mongoose.Schema(
         'APPEAL_STATUS',
         'DEMAND_SPIKE',
         'CUSTOM_REQUEST',
+        'CHAT_MESSAGE',
         'SYSTEM',
       ],
       default: 'SYSTEM',

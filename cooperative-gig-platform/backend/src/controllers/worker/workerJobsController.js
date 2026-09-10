@@ -272,7 +272,18 @@ const getActiveJobs = asyncHandler(async (req, res) => {
     .populate('customer', 'name phone avatar')
     .sort({ updatedAt: -1 });
 
-  res.json({ success: true, data: jobs });
+  // Server-side expiry on the read path: a job whose scheduled window has
+  // ended and whose worker never checked in must not surface as an active
+  // job (the reliability scheduler later formalises it to EXPIRED / no-show).
+  // Genuinely underway jobs (arrived/started/in progress) stay active.
+  const nowMs = Date.now();
+  const activeReady = jobs.filter((b) => {
+    if (b.workerCheckInAt || ['WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(b.status)) return true;
+    const { scheduledEndTime } = resolveScheduleTimes(b);
+    return !scheduledEndTime || scheduledEndTime.getTime() >= nowMs;
+  });
+
+  res.json({ success: true, data: activeReady });
 });
 
 // Start job
@@ -524,15 +535,16 @@ const updateJobStatus = asyncHandler(async (req, res) => {
 
   const { status } = req.body;
   const allowed = {
-    ASSIGNED: 'ACCEPTED',
-    ACCEPTED: 'ON_THE_WAY',
-    ON_THE_WAY: 'WORKER_ARRIVED',
-    WORKER_ARRIVED: 'IN_PROGRESS',
-    STARTED: 'IN_PROGRESS',
-    IN_PROGRESS: 'IN_PROGRESS',
+    ASSIGNED: ['ACCEPTED'],
+    ACCEPTED: ['ON_THE_WAY'],
+    ON_THE_WAY: ['WORKER_ARRIVED', 'STARTED'],
+    WORKER_ARRIVED: ['STARTED'],
+    STARTED: ['IN_PROGRESS'],
+    IN_PROGRESS: ['IN_PROGRESS'],
   };
 
-  if (!allowed[booking.status] || allowed[booking.status] !== status) {
+  const next = allowed[booking.status];
+  if (!next || !next.includes(status)) {
     throw new ApiError(`Cannot transition from ${booking.status} to ${status}`, 400);
   }
 

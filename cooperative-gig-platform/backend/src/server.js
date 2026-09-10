@@ -108,6 +108,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/collaborations', require('./routes/collaboratorRoutes'));
+app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/routes', require('./routes/routingRoutes'));
 app.use('/api/ai', aiRoutes);
 
 // Root route

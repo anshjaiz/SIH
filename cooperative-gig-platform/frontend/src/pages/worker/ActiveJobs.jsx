@@ -5,6 +5,8 @@ import { getSocket } from '../../services/socket';
 import { getJobTeam, getRequestsForBooking } from '../../services/collaboratorService';
 import RequestCollaboratorModal from '../../components/collaborator/RequestCollaboratorModal';
 import JobTeamCard from '../../components/collaborator/JobTeamCard';
+import ChatPanel from '../../components/ChatPanel';
+import NavigationPanel from '../../components/worker/NavigationPanel';
 
 export default function ActiveJobs() {
   const [jobs, setJobs] = useState([]);
@@ -13,6 +15,8 @@ export default function ActiveJobs() {
   const [requests, setRequests] = useState({});
   const [helperLocs, setHelperLocs] = useState({});
   const [requestingFor, setRequestingFor] = useState(null);
+  const [chatJob, setChatJob] = useState(null);
+  const [navJob, setNavJob] = useState(null);
 
   const load = async () => {
     try {
@@ -113,6 +117,11 @@ export default function ActiveJobs() {
     }
   };
 
+  const handleStartNav = (id) => {
+    console.log('START NAVIGATION BUTTON CLICKED', id);
+    handleStatus(id, 'ON_THE_WAY');
+  };
+
   const handleComplete = async (id) => {
     try {
       await api.post(`/workers/jobs/${id}/complete`);
@@ -193,7 +202,7 @@ export default function ActiveJobs() {
                   )}
                   {job.status === 'ACCEPTED' && (
                     <>
-                      <button onClick={() => handleStatus(job._id, 'ON_THE_WAY')} className="btn-primary flex-1">🚗 Start Navigation (On The Way)</button>
+                      <button onClick={() => handleStartNav(job._id)} className="btn-primary flex-1">🚗 Start Navigation (On The Way)</button>
                       <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 I've Arrived</button>
                     </>
                   )}
@@ -210,6 +219,19 @@ export default function ActiveJobs() {
                     <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ Complete Job</button>
                   )}
                 </div>
+
+                {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) && (
+                  <button onClick={() => setChatJob(job)} className="btn-secondary text-sm mt-3 w-full">
+                    💬 Message {job.customer?.name?.split(' ')[0] || 'customer'}
+                  </button>
+                )}
+
+                {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) &&
+                  Array.isArray(job.location?.coordinates) && job.location.coordinates.length >= 2 && (
+                  <button onClick={() => setNavJob(job)} className="btn-secondary text-sm mt-2 w-full border-brand-200 text-brand-700">
+                    🧭 Navigate to Job
+                  </button>
+                )}
 
               {/* Price */}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
@@ -280,6 +302,21 @@ export default function ActiveJobs() {
         </div>
       )}
 
+      <ChatPanel
+        bookingId={chatJob?._id}
+        open={chatJob !== null}
+        onClose={() => setChatJob(null)}
+        bookingNumber={chatJob?.bookingNumber}
+      />
+      <NavigationPanel
+        job={navJob}
+        open={navJob !== null}
+        onClose={() => setNavJob(null)}
+        onExpired={() => {
+          setNavJob(null);
+          load();
+        }}
+      />
       <RequestCollaboratorModal
         open={requestingFor !== null}
         booking={requestingFor}

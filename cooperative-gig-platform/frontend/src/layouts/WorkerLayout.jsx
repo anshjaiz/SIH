@@ -12,6 +12,10 @@ export default function WorkerLayout() {
   useEffect(() => {
     const load = async () => {
       if (user?.role !== 'worker') return;
+      // Ask for the live location at most once per browser session so the
+      // modal never keeps blocking the worker dashboard on every visit.
+      if (sessionStorage.getItem('wk_location_prompted') === '1') return;
+      sessionStorage.setItem('wk_location_prompted', '1');
       try {
         const res = await api.get('/workers/profile');
         const p = res.data;

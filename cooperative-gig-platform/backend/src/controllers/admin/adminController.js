@@ -10,7 +10,7 @@ const Service = require('../../models/Service');
 const Notification = require('../../models/Notification');
 const Cooperative = require('../../models/Cooperative');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
-const { refreshWorkerEligibility } = require('../../services/matching/matchingService');
+const { refreshWorkerEligibility, rematchAllOpenBookings } = require('../../services/matching/matchingService');
 
 // -------------------- Admin Dashboard --------------------
 
@@ -474,6 +474,21 @@ const updateCooperativeSettings = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Cooperative settings updated', data: coop });
 });
 
+/**
+ * Manually re-run smart matching for ALL open MATCHING bookings.
+ * Re-snapshots candidateWorkers, notifies + pushes socket events to any newly
+ * eligible workers. Used to heal stale candidate lists after eligibility
+ * changes (profile/skill verification, skill backfill, relocations).
+ */
+const rematchAllBookings = asyncHandler(async (req, res) => {
+  const result = await rematchAllOpenBookings();
+  res.json({
+    success: true,
+    message: `Re-matched ${result.bookingsReprocessed} open booking(s); ${result.newCandidatesAdded} worker(s) newly added`,
+    data: result,
+  });
+});
+
 module.exports = {
   getDashboardStats,
   getWorkers,
@@ -491,4 +506,5 @@ module.exports = {
   updateTraining,
   getCooperativeSettings,
   updateCooperativeSettings,
+  rematchAllBookings,
 };

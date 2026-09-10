@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import OtpVerify from '../../components/auth/OtpVerify';
 import toast from 'react-hot-toast';
 import { HiEye, HiEyeOff } from 'react-icons/hi';
 
@@ -9,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verifyEmail, setVerifyEmail] = useState(null);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -25,6 +27,8 @@ export default function Login() {
         toast.success('Login successful!');
         const role = result.data.user.role;
         navigate(`/${role === 'worker' ? 'worker' : role === 'admin' ? 'admin' : 'customer'}`);
+      } else if (/verify your email/i.test(result.message || '')) {
+        setVerifyEmail(email);
       } else {
         toast.error(result.message || 'Login failed');
       }
@@ -33,6 +37,24 @@ export default function Login() {
     }
     setLoading(false);
   };
+
+  const handleVerified = (data) => {
+    const role = data.user?.role;
+    navigate(`/${role === 'worker' ? 'worker' : 'customer'}`);
+  };
+
+  if (verifyEmail) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">
+        <OtpVerify
+          email={verifyEmail}
+          onVerified={handleVerified}
+          onBack={() => setVerifyEmail(null)}
+          heading="Verify your email to sign in"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">

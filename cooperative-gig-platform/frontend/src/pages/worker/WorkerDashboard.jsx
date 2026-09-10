@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import StatsCard from '../../components/StatsCard';
+import AIDemandAssistant from '../../components/worker/AIDemandAssistant';
 import { HiOutlineBriefcase, HiOutlineCurrencyRupee, HiOutlineClock, HiOutlineStar } from 'react-icons/hi';
 
 export default function WorkerDashboard() {
@@ -42,6 +43,9 @@ export default function WorkerDashboard() {
         <StatsCard title="Completed Jobs" value={stats.completedJobs} icon={HiOutlineBriefcase} color="brand" />
         <StatsCard title="Rating" value={stats.rating?.toFixed(1) || 'N/A'} icon={HiOutlineStar} color="warning" suffix={`(${stats.ratingCount || 0})`} />
       </div>
+
+      {/* AI Demand Assistant + Job Demand Heatmap */}
+      <AIDemandAssistant />
 
       {/* Verification status */}
       {data?.profile?.verificationStatus !== 'VERIFIED' && (

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Worker = require('../models/WorkerProfile');
 const { jwtSecret } = require('../config/env');
 const { suspensionStatus } = require('../utils/workerStatus');
+const { restoreIfExpired } = require('../services/worker/workerSuspensionService');
 
 // Protect routes - verify JWT token
 exports.protect = async (req, res, next) => {
@@ -46,7 +47,8 @@ exports.protect = async (req, res, next) => {
     // Workers under administrative suspension are blocked from every API call
     // (with a descriptive message) so an already-open session cannot keep working.
     if (user.role === 'worker') {
-      const workerProfile = await Worker.findOne({ user: user._id });
+      // A suspension whose deadline has passed lifts itself automatically.
+      const workerProfile = await restoreIfExpired(await Worker.findOne({ user: user._id }));
       const status = suspensionStatus(workerProfile);
       if (status) {
         return res.status(403).json({

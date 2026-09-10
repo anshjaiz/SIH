@@ -36,9 +36,12 @@ const {
   attemptReassignment,
 } = require('./reliabilityService');
 const { createNotification, notifyUsers } = require('../notification/notificationService');
+const { sweepExpiredSuspensions } = require('../worker/workerSuspensionService');
+const { rematchAllOpenBookings } = require('../matching/matchingService');
 
 let intervalHandle = null;
 let running = false;
+let lastRematchAt = 0;
 
 const minuteMs = 60 * 1000;
 const hourMs = 60 * minuteMs;
@@ -389,6 +392,43 @@ const handleCollaboratorNoShows = async (settings, now) => {
 };
 
 /**
+ * Lift suspensions whose deadline has passed so workers rejoin matching and
+ * earning automatically once their suspension period is over.
+ */
+const handleExpiredSuspensions = async () => {
+  const restored = await sweepExpiredSuspensions();
+  return restored.map(String);
+};
+
+/**
+ * Re-run smart matching for every open MATCHING booking so candidate lists
+ * stay fresh as eligibility data changes (new worker verified, skill
+ * verified/backfilled, worker moved, etc.). Without this pass a booking
+ * snapshotted before a worker became eligible would never surface to them.
+ *
+ * Throttled — runs on the first scheduler tick, then at most once every
+ * rematchIntervalMs (default 4 minutes) to keep the tick cheap when nothing
+ * is open.
+ */
+const REMATCH_INTERVAL_MS = 4 * minuteMs;
+
+const handleRematchOpenBookings = async (now = new Date()) => {
+  const nowMs = now.getTime();
+  if (nowMs - lastRematchAt < REMATCH_INTERVAL_MS) {
+    return { skipped: true, reason: 'throttled' };
+  }
+  try {
+    const result = await rematchAllOpenBookings();
+    lastRematchAt = nowMs;
+    return { skipped: false, ...result };
+  } catch (e) {
+    // Never let a rematch failure take down the tick; retry on the next pass.
+    lastRematchAt = nowMs - REMATCH_INTERVAL_MS + minuteMs;
+    throw e;
+  }
+};
+
+/**
  * Run one full pass of the scheduler. Returns a summary object (for tests).
  */
 const runSchedulerOnce = async () => {
@@ -397,14 +437,26 @@ const runSchedulerOnce = async () => {
   try {
     const settings = await getSettings();
     const now = new Date();
-    const [expired, noShows, retries, reminders, collabNoShows] = await Promise.all([
-      handleExpiredJobs(settings, now),
-      handleNoShows(settings, now),
-      handleReassignmentRetries(settings, now),
-      handleReminders(settings, now),
-      handleCollaboratorNoShows(settings, now),
-    ]);
-    return { skipped: false, expired, noShows, retries, reminders, collabNoShows };
+    const [expired, noShows, retries, reminders, collabNoShows, suspensions, rematch] =
+      await Promise.all([
+        handleExpiredJobs(settings, now),
+        handleNoShows(settings, now),
+        handleReassignmentRetries(settings, now),
+        handleReminders(settings, now),
+        handleCollaboratorNoShows(settings, now),
+        handleExpiredSuspensions(),
+        handleRematchOpenBookings(now),
+      ]);
+    return {
+      skipped: false,
+      expired,
+      noShows,
+      retries,
+      reminders,
+      collabNoShows,
+      suspensions,
+      rematch,
+    };
   } finally {
     running = false;
   }

@@ -30,6 +30,7 @@ export default function AdminComplaints() {
   const [proposal, setProposal] = useState({ decisionType: '', reason: '', amount: '' });
   const [escForm, setEscForm] = useState({ reason: '', to: 'Cooperative Dispute Committee' });
   const [suspForm, setSuspForm] = useState({ temporary: true, until: '', reason: '' });
+  const [unsuspForm, setUnsuspForm] = useState({ reason: '' });
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -411,6 +412,16 @@ export default function AdminComplaints() {
                   <input value={suspForm.reason} onChange={(e) => setSuspForm({ ...suspForm, reason: e.target.value })} placeholder="Suspension reason" className="input-field w-full mt-1" />
                   <button onClick={() => act('/suspend-worker', suspForm, 'Worker suspended')} disabled={!suspForm.reason.trim() || busy} className="btn-danger text-xs mt-2">Suspend worker</button>
                 </div>
+
+                {detail.workerProfile?.isActive === false && !detail.workerProfile?.terminatedAt && (
+                  <div className="border-t border-gray-100 pt-3">
+                    <label className="text-xs font-medium text-gray-600 text-green-700">Unsuspend worker</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <input value={unsuspForm.reason} onChange={(e) => setUnsuspForm({ ...unsuspForm, reason: e.target.value })} placeholder="Unsuspension reason (optional)" className="input-field w-full" />
+                      <button onClick={() => act('/unsuspend-worker', { reason: unsuspForm.reason }, 'Worker unsuspended')} disabled={busy} className="btn-success text-xs mt-1">Unsuspend worker</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

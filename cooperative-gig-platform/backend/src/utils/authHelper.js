@@ -26,6 +26,7 @@ const sanitizeUser = (user) => {
     avatar: user.avatar || '',
     languages: user.languages || [],
     isActive: user.isActive,
+    isEmailVerified: user.isEmailVerified,
     createdAt: user.createdAt,
   };
 };

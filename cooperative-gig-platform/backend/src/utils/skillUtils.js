@@ -9,9 +9,9 @@ const ACCEPTABLE_SKILLS = {
   'Pipe Leak Repair': ['Plumbing', 'Basic Plumbing'],
   'Tap Installation': ['Plumbing', 'Basic Plumbing'],
   'Toilet Repair': ['Plumbing', 'Basic Plumbing'],
-  'Electrical Wiring': ['Electrical Wiring', 'Advanced Electrical'],
-  'Fan/Appliance Fix': ['Electrical Wiring', 'Advanced Electrical'],
-  'Switch & Socket Repair': ['Electrical Wiring', 'Advanced Electrical'],
+  'Electrical Wiring': ['Electrical Wiring', 'Advanced Electrical', 'CCTV Installation', 'Solar Panel Installation'],
+  'Fan/Appliance Fix': ['Electrical Wiring', 'Advanced Electrical', 'CCTV Installation', 'Solar Panel Installation'],
+  'Switch & Socket Repair': ['Electrical Wiring', 'Advanced Electrical', 'CCTV Installation', 'Solar Panel Installation'],
   'Furniture Assembly': ['Carpentry'],
   'Cabinet Repair': ['Carpentry'],
   'Wall Painting': ['Painting'],
@@ -30,7 +30,7 @@ const ACCEPTABLE_SKILLS = {
 // Category-level fallback for services not listed above.
 const CATEGORY_SKILLS = {
   Plumbing: ['Plumbing', 'Basic Plumbing'],
-  Electrical: ['Electrical Wiring', 'Advanced Electrical'],
+  Electrical: ['Electrical Wiring', 'Advanced Electrical', 'CCTV Installation', 'Solar Panel Installation'],
   Carpentry: ['Carpentry'],
   Painting: ['Painting'],
   Cleaning: ['Cleaning', 'Domestic Help'],
@@ -63,6 +63,9 @@ const hasEligibleSkill = (worker, requiredSkillIds = []) => {
 
 /**
  * Skill match percentage (0-100) based only on verified skill _id equality.
+ * A worker holding at least one required skill is floored at 40 so that
+ * partial coverage of a multi-skill requirement never drops below the
+ * matching eligibility threshold (<30). Full coverage = 100.
  */
 const skillMatchPercent = (worker, requiredSkillIds = []) => {
   const ids = requiredSkillIds.map(String);
@@ -73,7 +76,7 @@ const skillMatchPercent = (worker, requiredSkillIds = []) => {
   if (workerIds.length === 0) return 0;
   const matched = ids.filter((id) => workerIds.includes(id)).length;
   if (matched === 0) return 0;
-  return Math.min(100, Math.round((matched / ids.length) * 100));
+  return Math.min(100, Math.max(40, Math.round((matched / ids.length) * 100)));
 };
 
 /* eslint-disable no-await-in-loop */

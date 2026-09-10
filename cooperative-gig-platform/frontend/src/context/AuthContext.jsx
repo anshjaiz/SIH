@@ -63,6 +63,10 @@ export const AuthProvider = ({ children }) => {
   const register = async (data) => {
     const res = await api.post('/auth/register', data);
     if (res.success) {
+      // Email verification required — do NOT auto-login until the OTP is confirmed.
+      if (res.requiresVerification) {
+        return { success: true, requiresVerification: true, email: res.data?.email, data: res.data };
+      }
       setUser(res.data.user);
       setProfile(res.data.profile || null);
       localStorage.setItem('token', res.data.token);
@@ -71,6 +75,26 @@ export const AuthProvider = ({ children }) => {
       return { success: true, data: res.data };
     }
     return { success: false, message: res.message };
+  };
+
+  const verifyOtp = async (email, otp) => {
+    const res = await api.post('/auth/verify-otp', { email, otp });
+    if (res.success) {
+      setUser(res.data.user);
+      setProfile(res.data.profile || null);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      connectSocket(res.data.user, res.data.profile || null);
+      return { success: true, data: res.data };
+    }
+    return { success: false, message: res.message, status: res.status };
+  };
+
+  const resendOtp = async (email) => {
+    const res = await api.post('/auth/resend-otp', { email });
+    return res.success
+      ? { success: true, message: res.message }
+      : { success: false, message: res.message, status: res.status };
   };
 
   const logout = async () => {
@@ -86,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     disconnectSocket();
   };
 
-  const value = { user, profile, login, register, logout, loading };
+  const value = { user, profile, login, register, verifyOtp, resendOtp, logout, loading };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

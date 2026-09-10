@@ -32,6 +32,7 @@ const {
   submitAppeal,
   getMyAppeals,
 } = require('../controllers/reliability/workerReliabilityController');
+const { getDemandAssistant } = require('../controllers/worker/workerDemandController');
 const {
   getWelfare,
   updateWelfare,
@@ -45,6 +46,9 @@ const { upload } = require('../middleware/uploadMiddleware');
 // Dashboard
 router.get('/dashboard', protect, getWorkerDashboard);
 router.get('/wand', protect, getWorkerDashboard); // alias for dashboard
+
+// AI Demand Assistant + job demand heatmap
+router.get('/demand/assistant', protect, getDemandAssistant);
 
 // Profile
 router.get('/profile', protect, getOwnProfile);

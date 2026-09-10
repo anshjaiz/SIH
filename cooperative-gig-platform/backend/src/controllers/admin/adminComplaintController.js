@@ -9,6 +9,7 @@
 const Complaint = require('../../models/Complaint');
 const User = require('../../models/User');
 const complaintService = require('../../services/complaint/complaintService');
+const { unsuspendWorkerByAdmin } = require('../../services/worker/workerSuspensionService');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 
 // GET /api/admin/complaints — filterable, pageable list
@@ -150,6 +151,36 @@ const suspendWorker = asyncHandler(async (req, res) => {
   res.json({ success: true, message, data: result });
 });
 
+// POST /api/admin/complaints/:id/unsuspend-worker
+const unsuspendWorker = asyncHandler(async (req, res) => {
+  const complaint = await Complaint.findById(req.params.id);
+  if (!complaint) throw new ApiError('Complaint not found', 404);
+  if (!complaint.worker) throw new ApiError('No worker attached to this complaint', 400);
+
+  await unsuspendWorkerByAdmin({
+    workerId: complaint.worker,
+    reason: req.body.reason || req.body.note || '',
+    byUserId: req.user._id,
+  });
+
+  complaint.workerAction = {
+    ...(complaint.workerAction || {}),
+    suspensionApplied: false,
+    unsuspendedAt: new Date(),
+    unsuspendedBy: req.user._id,
+    unsuspendReason: req.body.reason || '',
+  };
+  complaint.history.push({
+    status: complaint.status,
+    action: 'WORKER_UNSUSPENDED',
+    by: req.user._id,
+    note: req.body.reason || 'Worker unsuspended by admin',
+  });
+  await complaint.save();
+
+  res.json({ success: true, message: 'Worker unsuspended', data: { workerId: complaint.worker, accountStatus: 'ACTIVE' } });
+});
+
 module.exports = {
   getComplaints,
   getComplaintDetail,
@@ -159,4 +190,5 @@ module.exports = {
   finalizeResolution,
   escalate,
   suspendWorker,
+  unsuspendWorker,
 };

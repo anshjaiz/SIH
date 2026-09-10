@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import OtpVerify from '../../components/auth/OtpVerify';
 import toast from 'react-hot-toast';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'customer' });
   const [loading, setLoading] = useState(false);
+  const [verifyEmail, setVerifyEmail] = useState(null);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -24,7 +26,11 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await register(form);
-      if (result.success) {
+      if (result.success && result.requiresVerification) {
+        toast.success(result.message || 'Check your email for the verification code');
+        // Send the real address to the API; OtpVerify masks it client-side for display.
+        setVerifyEmail({ email: form.email.trim().toLowerCase(), role: form.role });
+      } else if (result.success) {
         toast.success('Registration successful!');
         navigate(`/${form.role === 'worker' ? 'worker' : 'customer'}`);
       } else {
@@ -35,6 +41,23 @@ export default function Register() {
     }
     setLoading(false);
   };
+
+  const handleVerified = (data) => {
+    const role = data.user?.role;
+    navigate(`/${role === 'worker' ? 'worker' : 'customer'}`);
+  };
+
+  if (verifyEmail) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">
+        <OtpVerify
+          email={verifyEmail.email}
+          onVerified={handleVerified}
+          onBack={() => setVerifyEmail(null)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">

@@ -7,4 +7,6 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientURL: process.env.CLIENT_URL || 'http://localhost:5173',
   osrmBaseUrl: process.env.OSRM_BASE_URL || 'https://router.project-osrm.org',
+  resendApiKey: process.env.RESEND_API_KEY || '',
+  emailFrom: process.env.EMAIL_FROM || 'onboarding@resend.dev',
 };

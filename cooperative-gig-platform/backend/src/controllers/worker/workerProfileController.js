@@ -80,24 +80,41 @@ const addSkill = asyncHandler(async (req, res) => {
 
   const { skillId, name, yearsOfExperience } = req.body;
 
+  // Colloquial free-text names sometimes reach this endpoint without a
+  // skill _id. Resolve every entry to a real Skill so the strict matching
+  // gate (which compares by stable _id) can ever find the worker.
+  const ALIAS_SKILLS = {
+    plumber: 'Plumbing',
+    electrician: 'Electrical Wiring',
+    'electrical wiring': 'Electrical Wiring',
+    'basic plumbing': 'Basic Plumbing',
+  };
+
+  let skill = null;
   let skillName = name;
   if (skillId) {
-    const skill = await Skill.findById(skillId);
+    skill = await Skill.findById(skillId);
     if (!skill) throw new ApiError('Skill not found', 404);
     skillName = skill.name;
+  } else if (skillName) {
+    const clean = String(skillName).trim();
+    skill =
+      (await Skill.findOne({ name: { $regex: `^${clean}$`, $options: 'i' } })) ||
+      (await Skill.findOne({ name: ALIAS_SKILLS[clean.toLowerCase()] }));
   }
-  if (!skillName) throw new ApiError('Skill name is required', 400);
+  if (!skill) throw new ApiError('Skill not found. Choose a skill from the list', 400);
+  skillName = skill.name;
 
   // Avoid duplicates
   const exists = worker.skills.some(
     (s) =>
-      (s.name || '').toLowerCase() === skillName.toLowerCase() ||
-      (skillId && s.skill && String(s.skill) === String(skillId))
+      (s.skill && String(s.skill) === String(skill._id)) ||
+      (s.name || '').toLowerCase() === String(skillName).toLowerCase()
   );
   if (exists) throw new ApiError('Skill already added', 400);
 
   worker.skills.push({
-    skill: skillId,
+    skill: skill._id,
     name: skillName,
     // New skills are NOT auto-eligible: an admin must verify the skill before
     // the worker is matched for jobs requiring it.

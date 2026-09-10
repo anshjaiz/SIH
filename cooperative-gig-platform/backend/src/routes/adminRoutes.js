@@ -17,6 +17,7 @@ const {
   updateTraining,
   getCooperativeSettings,
   updateCooperativeSettings,
+  rematchAllBookings,
 } = require('../controllers/admin/adminController');
 const {
   getComplaints: acGetComplaints,
@@ -27,6 +28,7 @@ const {
   finalizeResolution,
   escalate,
   suspendWorker,
+  unsuspendWorker,
 } = require('../controllers/admin/adminComplaintController');
 const {
   getForecasts,
@@ -53,6 +55,9 @@ router.use(protect, authorize('admin'));
 
 // Dashboard
 router.get('/dashboard', getDashboardStats);
+
+// Matching
+router.post('/matching/rematch', rematchAllBookings);
 
 // Analytics & AI
 router.get('/analytics', getAnalytics);
@@ -101,6 +106,7 @@ router.post('/complaints/:id/propose-resolution', proposeResolution);
 router.post('/complaints/:id/finalize-resolution', finalizeResolution);
 router.post('/complaints/:id/escalate', escalate);
 router.post('/complaints/:id/suspend-worker', suspendWorker);
+router.post('/complaints/:id/unsuspend-worker', unsuspendWorker);
 
 // Training (admin)
 router.post('/trainings', createTraining);

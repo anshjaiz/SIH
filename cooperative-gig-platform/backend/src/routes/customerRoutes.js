@@ -23,6 +23,10 @@ const {
   initiatePayment,
   getPaymentForBooking,
 } = require('../controllers/shared/paymentController');
+const {
+  approveMaterialRequest,
+  rejectMaterialRequest,
+} = require('../controllers/shared/materialRequestController');
 const { protect } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/uploadMiddleware');
 
@@ -40,6 +44,8 @@ router.get('/bookings/:id', protect, getBookingById);
 router.put('/bookings/:id/cancel', protect, cancelBooking);
 router.post('/bookings/:id/reassign', protect, requestReassignment);
 router.post('/bookings/:id/confirm', protect, confirmCompletion);
+router.post('/bookings/:id/material-request/:requestId/approve', protect, approveMaterialRequest);
+router.post('/bookings/:id/material-request/:requestId/reject', protect, rejectMaterialRequest);
 
 // Payments
 router.post('/payments', protect, initiatePayment);

@@ -17,6 +17,18 @@ export default function AIDemandAssistant() {
   const [navLoading, setNavLoading] = useState(false);
   const [mapCenter, setMapCenter] = useState(null);
   const [mapKey, setMapKey] = useState(0);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    const onFocus = () => {
+      load();
+      setFocused(true);
+      setTimeout(() => setFocused(false), 2500);
+    };
+    window.addEventListener('shramiksetu:focus-demand', onFocus);
+    return () => window.removeEventListener('shramiksetu:focus-demand', onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -131,7 +143,10 @@ export default function AIDemandAssistant() {
     (recommendation.insideRadius || recommendation.distanceKm <= workerLoc.radiusKm * 1.2);
 
   return (
-    <div className="card">
+    <div
+      id="shramiksetu-demand-heatmap"
+      className={`card scroll-mt-24 transition-shadow ${focused ? 'ring-2 ring-brand-500 shadow-lg' : ''}`}
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-xl">🤖</span>

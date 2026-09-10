@@ -141,6 +141,26 @@ const bookingSchema = new mongoose.Schema(
       platformFee: { type: Number, default: 0 },
       total: { type: Number, default: 0 },
     },
+    // Material-cost approval flow: the worker requests and the customer
+    // explicitly approves/rejects before it counts toward the payable total.
+    // Only APPROVED requests are summed into priceBreakdown.materials/total.
+    materialRequests: [
+      {
+        description: { type: String, required: true, trim: true },
+        amount: { type: Number, required: true, min: 0 },
+        note: { type: String, trim: true, default: '' },
+        status: {
+          type: String,
+          enum: ['pending', 'approved', 'rejected'],
+          default: 'pending',
+        },
+        requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Worker' },
+        requestedAt: { type: Date, default: Date.now },
+        approvedAt: Date,
+        rejectedAt: Date,
+        respondedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      },
+    ],
     // Matching info
     matchedScore: {
       type: Number,

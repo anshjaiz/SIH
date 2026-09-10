@@ -1,9 +1,15 @@
 // Pricing utility - computes price breakdown and worker earnings
 
 /**
- * Compute price breakdown for a service
- * @param {Number} labourCost - base labour
- * @param {Number} materialsCost - estimated materials
+ * Compute price breakdown for a service.
+ *
+ * The customer-facing price (total) is ALL-INCLUSIVE: it equals
+ * labour + materials only. The platform fee and cooperative contribution are
+ * carved out internally from the service charge (shown as "Included"), never
+ * added on top of what the customer sees.
+ *
+ * @param {Number} labourCost - base labour (service charge)
+ * @param {Number} materialsCost - approved material cost (0 at booking creation)
  * @param {Object} cooperativeConfig - { cooperativeContributionPercent, platformFeePercent, gstPercent }
  */
 const computePriceBreakdown = (
@@ -18,11 +24,12 @@ const computePriceBreakdown = (
 
   // Cooperative contribution is typically a fixed percentage of labour
   const cooperativeContribution = (labour * cooperativeContributionPercent) / 100;
-  // Platform fee on subtotal
+  // Platform fee on subtotal (informational share of the all-inclusive price)
   const subtotal = labour + materials;
   const platformFee = (subtotal * platformFeePercent) / 100;
 
-  const total = Math.round((labour + materials + cooperativeContribution + platformFee) * 100) / 100;
+  // All-inclusive: service charge + approved materials. No fee on top.
+  const total = Math.round((labour + materials) * 100) / 100;
 
   return {
     labour,

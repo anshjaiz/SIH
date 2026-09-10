@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import StatsCard from '../../components/StatsCard';
 import AIDemandAssistant from '../../components/worker/AIDemandAssistant';
+import WorkerAIAssistant from '../../components/worker/WorkerAIAssistant';
 import { HiOutlineBriefcase, HiOutlineCurrencyRupee, HiOutlineClock, HiOutlineStar } from 'react-icons/hi';
 
 export default function WorkerDashboard() {
@@ -46,6 +47,9 @@ export default function WorkerDashboard() {
 
       {/* AI Demand Assistant + Job Demand Heatmap */}
       <AIDemandAssistant />
+
+      {/* ShramikSetu AI Assistant chatbot */}
+      <WorkerAIAssistant />
 
       {/* Verification status */}
       {data?.profile?.verificationStatus !== 'VERIFIED' && (

@@ -68,11 +68,11 @@ export default function BookingDetails() {
     const poll = async () => {
       try {
         const res = await api.get(`/customers/bookings/${id}`);
+        setBooking(res.data);
         if (isValidCoords(res.data.workerLocation?.coordinates)) {
           setWorkerLocation(res.data.workerLocation.coordinates);
           setSyncedAt(new Date());
         }
-        if (res.data.status !== booking.status) load();
       } catch { /* ignore */ }
     };
     const t = setInterval(poll, 15000);
@@ -80,18 +80,27 @@ export default function BookingDetails() {
   }, [trackingActive, id]);
 
   useEffect(() => {
-    if (!trackingActive) return;
     const socket = getSocket();
-    if (!socket) return;
+    if (!socket) return undefined;
     const handler = (d) => {
-      if (d.bookingId === id && isValidCoords(d.coordinates)) {
-        setWorkerLocation(d.coordinates);
-        setSyncedAt(new Date());
+      if (d.bookingId === id) {
+        if (isValidCoords(d.coordinates)) {
+          setWorkerLocation(d.coordinates);
+          setSyncedAt(new Date());
+        } else {
+          load();
+        }
       }
     };
     socket.on('worker_location', handler);
-    return () => socket.off('worker_location', handler);
-  }, [trackingActive, id]);
+    socket.on('booking_update', handler);
+    socket.on('material_request_update', handler);
+    return () => {
+      socket.off('worker_location', handler);
+      socket.off('booking_update', handler);
+      socket.off('material_request_update', handler);
+    };
+  }, [id]);
 
   const handleConfirm = async () => {
     try {
@@ -136,6 +145,26 @@ export default function BookingDetails() {
       } else {
         toast.error(res.message || 'No replacement worker available right now');
       }
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
+  const handleApproveMaterial = async (requestId) => {
+    try {
+      await api.post(`/customers/bookings/${id}/material-request/${requestId}/approve`);
+      toast.success('Material cost approved');
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed');
+    }
+  };
+
+  const handleRejectMaterial = async (requestId) => {
+    try {
+      await api.post(`/customers/bookings/${id}/material-request/${requestId}/reject`);
+      toast.success('Material cost rejected — original service charge kept');
       load();
     } catch (err) {
       toast.error(err.message || 'Failed');
@@ -354,17 +383,66 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Price breakdown */}
+      {/* Payment Summary */}
       {booking.priceBreakdown && (
         <div className="card">
-          <h4 className="font-semibold mb-3">Price Breakdown</h4>
+          <h4 className="font-semibold mb-3">Payment Summary</h4>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-600">Labour</span><span>₹{booking.priceBreakdown.labour}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Materials</span><span>₹{booking.priceBreakdown.materials}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Cooperative contribution</span><span>₹{booking.priceBreakdown.cooperativeContribution}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Platform fee</span><span>₹{booking.priceBreakdown.platformFee}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">Service Charge</span><span>₹{booking.priceBreakdown.labour || 0}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">Material Cost</span><span>₹{booking.priceBreakdown.materials || 0}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">Platform Fee</span><span>Included</span></div>
             <hr className="border-gray-200" />
-            <div className="flex justify-between font-bold"><span>Total</span><span className="text-brand-600">₹{booking.priceBreakdown.total}</span></div>
+            <div className="flex justify-between font-bold"><span>Total</span><span className="text-brand-600">₹{booking.priceBreakdown.total || 0}</span></div>
+          </div>
+          {booking.priceBreakdown.materials > 0 && (
+            <p className="text-xs text-gray-400 mt-2">
+              Material cost shown only after you approved the worker&apos;s request.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Material Requests (worker requested → customer approves/rejects) */}
+      {Array.isArray(booking.materialRequests) && booking.materialRequests.length > 0 && (
+        <div className="card">
+          <h4 className="font-semibold mb-3">Material Requests</h4>
+          <div className="space-y-3">
+            {booking.materialRequests.map((mr) => {
+              const isPending = mr.status === 'pending';
+              const isApproved = mr.status === 'approved';
+              const isRejected = mr.status === 'rejected';
+              return (
+                <div key={mr._id} className={`p-3 rounded-lg border ${isPending ? 'border-yellow-300 bg-yellow-50' : isApproved ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-sm">{mr.description}</p>
+                    <span className={`badge ${isPending ? 'badge-warning' : isApproved ? 'badge-success' : 'badge-gray'}`}>
+                      {isPending ? 'Pending Customer Approval' : isApproved ? 'Approved' : 'Rejected'}
+                    </span>
+                  </div>
+                  <p className="text-sm mt-1">Cost: ₹{mr.amount}</p>
+                  {mr.note && <p className="text-xs text-gray-500 mt-1">Note: {mr.note}</p>}
+                  {mr.requestedAt && (
+                    <p className="text-xs text-gray-400 mt-1">Requested: {new Date(mr.requestedAt).toLocaleString()}</p>
+                  )}
+                  {isPending && (
+                    <div className="mt-3 p-3 rounded-lg bg-white border border-gray-200">
+                      <p className="font-semibold text-sm text-gray-900">Additional Material Required</p>
+                      <p className="text-sm mt-1">Material: {mr.description}</p>
+                      <p className="text-sm">Cost: ₹{mr.amount}</p>
+                      <p className="text-sm">Current Service Charge: ₹{booking.priceBreakdown?.labour || 0}</p>
+                      <p className="text-sm">New Total: ₹{(booking.priceBreakdown?.labour || 0) + mr.amount}</p>
+                      <div className="flex gap-2 mt-3">
+                        <button onClick={() => handleApproveMaterial(mr._id)} className="btn-success text-sm">✓ Approve</button>
+                        <button onClick={() => handleRejectMaterial(mr._id)} className="btn-danger text-sm">✕ Reject</button>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Your total only changes after you approve. Rejecting keeps the original service charge.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -393,6 +471,7 @@ export default function BookingDetails() {
           {booking.status === 'COMPLETED' && (
             <>
               <button onClick={handleConfirm} className="btn-success text-sm">Confirm Completion</button>
+              <button onClick={handlePay} className="btn-primary text-sm">Pay Now</button>
             </>
           )}
           {booking.status === 'ACCEPTED' && (

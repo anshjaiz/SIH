@@ -27,7 +27,6 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     endTime,
     isEmergency,
     emergencyType,
-    materialsEstimate = 0,
   } = req.body;
 
   if (!serviceId) throw new ApiError('Service is required', 400);
@@ -39,11 +38,13 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     throw new ApiError('Location is required', 400);
   }
 
-  // Compute price
+  // Compute price. No material estimate at booking time — the customer is not
+  // expected to know material costs before the worker visits. Materials are
+  // added later only via the worker's + customer-approved material request.
   const coop = await Cooperative.findOne().sort({ createdAt: -1 });
   const priceBreakdown = computePriceBreakdown(
     service.basePrice,
-    materialsEstimate,
+    0,
     coop
   );
 

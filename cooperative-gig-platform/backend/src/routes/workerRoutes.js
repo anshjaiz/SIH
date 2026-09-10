@@ -33,6 +33,10 @@ const {
   getMyAppeals,
 } = require('../controllers/reliability/workerReliabilityController');
 const { getDemandAssistant } = require('../controllers/worker/workerDemandController');
+const { chatHandler } = require('../controllers/worker/workerAssistantController');
+const {
+  submitMaterialRequest,
+} = require('../controllers/shared/materialRequestController');
 const {
   getWelfare,
   updateWelfare,
@@ -42,6 +46,16 @@ const {
 } = require('../controllers/worker/welfareController');
 const { protect } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/uploadMiddleware');
+const rateLimit = require('express-rate-limit');
+
+// Cost control for the AI chatbot: max 10 chat requests per IP per minute.
+const aiChatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many AI requests, please wait a moment and try again' },
+});
 
 // Dashboard
 router.get('/dashboard', protect, getWorkerDashboard);
@@ -49,6 +63,9 @@ router.get('/wand', protect, getWorkerDashboard); // alias for dashboard
 
 // AI Demand Assistant + job demand heatmap
 router.get('/demand/assistant', protect, getDemandAssistant);
+
+// ShramikSetu AI Assistant (chatbot)
+router.post('/ai-assistant/chat', protect, aiChatLimiter, chatHandler);
 
 // Profile
 router.get('/profile', protect, getOwnProfile);
@@ -77,6 +94,7 @@ router.post('/jobs/:id/arrive', protect, arriveBooking);
 router.post('/jobs/:id/complete', protect, upload.array('afterImages', 5), completeJob);
 router.post('/jobs/:id/status', protect, updateJobStatus);
 router.post('/jobs/:id/confirm', protect, confirmCompletion);
+router.post('/jobs/:id/material-request', protect, submitMaterialRequest);
 
 // Reliability
 router.get('/me/reliability', protect, getMyReliability);

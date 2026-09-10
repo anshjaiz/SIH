@@ -16,7 +16,6 @@ export default function CreateRequest() {
     timeSlot: 'Morning',
     isEmergency: false,
     emergencyType: '',
-    materialsEstimate: 0,
     lat: '17.385',
     lng: '78.487',
   });
@@ -80,7 +79,6 @@ export default function CreateRequest() {
         timeSlot: form.timeSlot,
         isEmergency: form.isEmergency,
         emergencyType: form.emergencyType,
-        materialsEstimate: parseFloat(form.materialsEstimate) || 0,
       };
 
       const res = await api.post('/customers/bookings', payload);
@@ -195,15 +193,21 @@ export default function CreateRequest() {
         </div>
 
         <div>
-          <label className="label-text">Estimated materials cost (₹)</label>
-          <input
-            type="number"
-            name="materialsEstimate"
-            className="input-field"
-            value={form.materialsEstimate}
-            onChange={handleChange}
-            min={0}
-          />
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-semibold text-gray-900">Service Charge</p>
+            <p className="font-semibold text-brand-600">₹{service?.basePrice || 0}</p>
+          </div>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-gray-600">Platform / App Fee</p>
+            <p className="text-sm text-gray-600">Included</p>
+          </div>
+          <div className="flex items-center justify-between border-t border-gray-100 pt-2">
+            <p className="font-semibold text-gray-900">Total</p>
+            <p className="font-bold text-brand-600">₹{service?.basePrice || 0}</p>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            No material cost is charged now. If materials are needed, your worker will send an approval request after visiting.
+          </p>
         </div>
 
         <button type="submit" disabled={loading || !serviceId} className="btn-primary w-full">

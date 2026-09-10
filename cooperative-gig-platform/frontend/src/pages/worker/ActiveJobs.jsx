@@ -17,6 +17,9 @@ export default function ActiveJobs() {
   const [requestingFor, setRequestingFor] = useState(null);
   const [chatJob, setChatJob] = useState(null);
   const [navJob, setNavJob] = useState(null);
+  const [materialJob, setMaterialJob] = useState(null);
+  const [materialForm, setMaterialForm] = useState({ description: '', amount: '', note: '' });
+  const [materialSubmitting, setMaterialSubmitting] = useState(false);
 
   const load = async () => {
     try {
@@ -75,6 +78,8 @@ export default function ActiveJobs() {
       }
     };
     socket.on('collaboration_update', onUpdate);
+    socket.on('material_request_update', onUpdate);
+    socket.on('booking_update', onUpdate);
     const onHelperLoc = (payload) => {
       if (payload?.helperId && Array.isArray(payload?.coordinates)) {
         setHelperLocs((prev) => ({ ...prev, [payload.helperId]: payload.coordinates }));
@@ -139,6 +144,35 @@ export default function ActiveJobs() {
       load();
     } catch (err) {
       toast.error(err.message || 'Failed');
+    }
+  };
+
+  const openMaterialModal = (job) => {
+    setMaterialForm({ description: '', amount: '', note: '' });
+    setMaterialJob(job);
+  };
+
+  const handleSubmitMaterial = async (e) => {
+    e.preventDefault();
+    const amount = parseFloat(materialForm.amount);
+    if (!materialForm.description.trim() || !amount || amount <= 0) {
+      toast.error('Material name and a positive amount are required');
+      return;
+    }
+    setMaterialSubmitting(true);
+    try {
+      await api.post(`/workers/jobs/${materialJob._id}/material-request`, {
+        description: materialForm.description.trim(),
+        amount,
+        note: materialForm.note.trim(),
+      });
+      toast.success('Material cost request sent — awaiting customer approval');
+      setMaterialJob(null);
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit material request');
+    } finally {
+      setMaterialSubmitting(false);
     }
   };
 
@@ -235,12 +269,46 @@ export default function ActiveJobs() {
 
               {/* Price */}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
-                <div className="flex justify-between"><span>Labour</span><span>₹{job.priceBreakdown?.labour}</span></div>
-                <div className="flex justify-between"><span>Materials</span><span>₹{job.priceBreakdown?.materials}</span></div>
+                <div className="flex justify-between"><span>Service Charge</span><span>₹{job.priceBreakdown?.labour || 0}</span></div>
+                <div className="flex justify-between"><span>Materials (approved)</span><span>₹{job.priceBreakdown?.materials || 0}</span></div>
+                <div className="flex justify-between"><span>Platform Fee</span><span>Included</span></div>
                 <div className="flex justify-between font-bold border-t mt-1 pt-1">
-                  <span>Total</span><span className="text-brand-600">₹{job.priceBreakdown?.total}</span>
+                  <span>Total</span><span className="text-brand-600">₹{job.priceBreakdown?.total || 0}</span>
                 </div>
               </div>
+
+              {/* Material requests */}
+              {Array.isArray(job.materialRequests) && job.materialRequests.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {job.materialRequests.map((mr) => (
+                    <div
+                      key={mr._id}
+                      className={`p-2 rounded-lg border text-sm ${
+                        mr.status === 'pending'
+                          ? 'border-yellow-300 bg-yellow-50'
+                          : mr.status === 'approved'
+                          ? 'border-green-200 bg-green-50'
+                          : 'border-gray-200 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">{mr.description}</p>
+                        <span className={`badge ${mr.status === 'pending' ? 'badge-warning' : mr.status === 'approved' ? 'badge-success' : 'badge-gray'}`}>
+                          {mr.status === 'pending' ? 'Pending Customer Approval' : mr.status === 'approved' ? 'Approved' : 'Rejected'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">₹{mr.amount}{mr.note ? ` • ${mr.note}` : ''}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) &&
+                !(job.materialRequests || []).some((mr) => mr.status === 'pending') && (
+                  <button onClick={() => openMaterialModal(job)} className="btn-secondary text-sm mt-3 w-full border-brand-200 text-brand-700">
+                    + Add Material Cost
+                  </button>
+                )}
 
               {/* Collaboration */}
               {(teams[job._id] !== undefined || ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status)) && (
@@ -333,6 +401,61 @@ export default function ActiveJobs() {
           }
         }}
       />
+
+      {/* Add Material Cost modal */}
+      {materialJob && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">+ Add Material Cost</h3>
+              <button onClick={() => setMaterialJob(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <form onSubmit={handleSubmitMaterial} className="p-6 space-y-4">
+              <p className="text-sm text-gray-500">
+                {materialJob.serviceSnapshot?.name} • Current service charge ₹{materialJob.priceBreakdown?.labour || 0}. The customer must approve any material cost before it is added to your total.
+              </p>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Material name / description *</label>
+                <input
+                  type="text"
+                  className="input-field mt-1"
+                  placeholder="e.g., PVC pipe and connector"
+                  value={materialForm.description}
+                  onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Amount (₹) *</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="input-field mt-1"
+                  placeholder="e.g., 180"
+                  value={materialForm.amount}
+                  onChange={(e) => setMaterialForm({ ...materialForm, amount: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600">Note (optional)</label>
+                <textarea
+                  rows={2}
+                  className="input-field mt-1"
+                  placeholder="e.g., Needed to replace the old joint as well"
+                  value={materialForm.note}
+                  onChange={(e) => setMaterialForm({ ...materialForm, note: e.target.value })}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setMaterialJob(null)} className="btn-secondary text-sm">Cancel</button>
+                <button type="submit" disabled={materialSubmitting} className="btn-primary text-sm">
+                  {materialSubmitting ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

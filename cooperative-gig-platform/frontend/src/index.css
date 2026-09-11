@@ -47,6 +47,113 @@
   .sidebar-link.active {
     @apply bg-brand-100 text-brand-700;
   }
+
+  .auth-page {
+    background: #f7f5ef;
+    color: #17211b;
+    min-height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .auth-page::before {
+    background: #e8b448;
+    border-radius: 999px;
+    content: '';
+    height: 22rem;
+    left: -11rem;
+    opacity: 0.18;
+    position: absolute;
+    top: -9rem;
+    width: 22rem;
+  }
+
+  .auth-shell {
+    background: #fffdf8;
+    border: 1px solid rgba(23, 33, 27, 0.1);
+    box-shadow: 0 24px 70px rgba(43, 55, 42, 0.14);
+  }
+
+  .auth-story {
+    background: #183b32;
+    background-image: radial-gradient(circle at 82% 14%, rgba(220, 178, 73, 0.22), transparent 24%), linear-gradient(145deg, #245746, #102c27);
+    color: #fffdf8;
+    min-height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .auth-story::after {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 50%;
+    bottom: -7rem;
+    content: '';
+    height: 22rem;
+    position: absolute;
+    right: -7rem;
+    width: 22rem;
+  }
+
+  .auth-mark {
+    align-items: center;
+    background: #e2b34e;
+    border-radius: 0.9rem;
+    color: #183b32;
+    display: inline-flex;
+    font-size: 1.15rem;
+    font-weight: 800;
+    height: 2.9rem;
+    justify-content: center;
+    letter-spacing: -0.04em;
+    width: 2.9rem;
+  }
+
+  .auth-input {
+    background: #fffdf8;
+    border: 1px solid #d7dbd2;
+    border-radius: 0.65rem;
+    color: #17211b;
+    padding: 0.78rem 0.9rem;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+    width: 100%;
+  }
+
+  .auth-input:focus {
+    border-color: #2d725d;
+    box-shadow: 0 0 0 3px rgba(45, 114, 93, 0.14);
+    outline: none;
+  }
+
+  .auth-button {
+    background: #245f4e;
+    border-radius: 0.65rem;
+    color: white;
+    font-weight: 700;
+    padding: 0.82rem 1rem;
+    transition: background 160ms ease, transform 160ms ease;
+    width: 100%;
+  }
+
+  .auth-button:hover {
+    background: #1b4b3e;
+    transform: translateY(-1px);
+  }
+
+  .auth-role {
+    border: 1px solid #d7dbd2;
+    border-radius: 0.65rem;
+    color: #526158;
+    padding: 0.75rem;
+    text-align: left;
+    transition: all 160ms ease;
+  }
+
+  .auth-role.selected {
+    background: #edf5ef;
+    border-color: #2d725d;
+    box-shadow: 0 0 0 2px rgba(45, 114, 93, 0.1);
+    color: #245f4e;
+  }
 }
 
 .leaflet-container {

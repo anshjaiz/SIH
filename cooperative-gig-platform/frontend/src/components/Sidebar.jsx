@@ -58,16 +58,16 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
   };
 
   return (
-    <aside className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'} fixed h-full z-40`}>
+    <aside className={`flex flex-col border-r border-[#dfe5dc] bg-[#183d31] text-white transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'} fixed h-full z-40`}>
       {/* Logo */}
-      <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4">
+      <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
         {!collapsed && (
           <div className="flex flex-col min-w-0">
-            <span className="font-bold text-brand-700 text-sm truncate">{t('app.name')}</span>
-            <span className="text-[10px] text-gray-500 leading-tight truncate">{t('app.platformTagline')}</span>
+            <span className="truncate text-sm font-bold text-white">{t('app.name')}</span>
+            <span className="truncate text-[10px] leading-tight text-emerald-100/60">{t('app.platformTagline')}</span>
           </div>
         )}
-        <button onClick={() => setCollapsed(!collapsed)} className="text-gray-500 hover:text-gray-700 p-1 rounded-md">
+        <button onClick={() => setCollapsed(!collapsed)} className="rounded-md p-1 text-emerald-100/60 hover:bg-white/10 hover:text-white">
           {collapsed ? <HiOutlineMenu className="w-5 h-5" /> : <HiOutlineX className="w-5 h-5" />}
         </button>
       </div>
@@ -80,7 +80,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'active' : ''}`
+              `sidebar-link sidebar-link-dark ${isActive ? 'active' : ''}`
             }
             title={collapsed ? item.label : ''}
           >
@@ -91,13 +91,13 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       </nav>
 
       {/* User + Logout */}
-      <div className="border-t border-gray-100 px-3 py-4">
+      <div className="border-t border-white/10 px-3 py-4">
         {!collapsed && (
-          <div className="text-xs text-gray-600 truncate mb-2 px-4">{user?.name}</div>
+          <div className="mb-2 truncate px-4 text-xs text-emerald-100/70">{user?.name}</div>
         )}
         <button
           onClick={handleLogout}
-          className="sidebar-link w-full text-left text-red-600 hover:bg-red-50 hover:text-red-700"
+          className="sidebar-link w-full text-left text-rose-200 hover:bg-rose-400/10 hover:text-white"
         >
           <HiOutlineLogout className={ICON_CLASS} />
           {!collapsed && <span>{t('nav.logout')}</span>}

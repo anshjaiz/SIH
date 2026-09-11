@@ -115,15 +115,15 @@ export default function OtpVerify({ email, onVerified, onBack, heading }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-100 rounded-xl mb-4">
-          <span className="text-2xl">✉️</span>
+    <div className="auth-shell w-full max-w-md rounded-[1.25rem] p-6 sm:p-8">
+      <div className="mb-8 text-center">
+        <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
+          <span className="text-xl">✉</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">{displayHeading}</h1>
-        <p className="text-sm text-gray-500 mt-2">
+        <h1 className="text-2xl font-bold tracking-tight text-[#17211b]">{displayHeading}</h1>
+        <p className="mt-2 text-sm text-[#68756b]">
           {t('auth.otpSentTo')}{' '}
-          <span className="font-medium text-gray-700">{maskEmail(email)}</span>. {t('auth.otpExpiresIn', { minutes: 5 })}
+          <span className="font-semibold text-[#35443a]">{maskEmail(email)}</span>. {t('auth.otpExpiresIn', { minutes: 5 })}
         </p>
       </div>
 
@@ -138,7 +138,7 @@ export default function OtpVerify({ email, onVerified, onBack, heading }) {
               onKeyDown={(e) => handleKeyDown(i, e)}
               inputMode="numeric"
               maxLength={2}
-              className={`w-11 h-14 text-center text-xl font-bold border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+              className={`h-14 w-11 rounded-lg border-2 text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 d ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-900'
               }`}
               aria-label={t('auth.digitLabel', { number: i + 1 })}
@@ -158,13 +158,13 @@ export default function OtpVerify({ email, onVerified, onBack, heading }) {
         </button>
       </form>
 
-      <div className="mt-5 text-center text-sm text-gray-600">
+      <div className="mt-5 text-center text-sm text-[#68756b]">
         <span>{t('auth.didntReceive')}</span>{' '}
         <button
           type="button"
           onClick={() => handleResend()}
           disabled={cooldown > 0 || resending}
-          className="text-brand-600 font-medium hover:text-brand-800 disabled:text-gray-400"
+          className="font-bold text-brand-600 hover:text-brand-800 disabled:text-gray-400"
         >
           {resending ? t('auth.sending') : cooldown > 0 ? t('auth.resendCodeIn', { seconds: cooldown }) : t('auth.resendCode')}
         </button>

@@ -43,18 +43,19 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">
+    <div className="auth-page flex items-center justify-center p-4 sm:p-8">
       <div className="absolute top-4 right-4"><LanguageSelector /></div>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">{t('auth.resetPassword')}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t('auth.resetHelp')}</p>
+      <div className="auth-shell w-full max-w-md rounded-[1.25rem] p-6 sm:p-8">
+        <div className="mb-8">
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#c18b25]">Account recovery</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#17211b]">{t('auth.resetPassword')}</h1>
+          <p className="mt-2 text-sm text-[#68756b]">{t('auth.resetHelp')}</p>
         </div>
 
         {step === 1 && (
           <form onSubmit={handleRequest} className="space-y-4">
             <div>
-              <label className="label-text">{t('auth.emailAddress')}</label>
+              <label className="mb-2 block text-sm font-semibold text-[#35443a]">{t('auth.emailAddress')}</label>
               <input type="email" className="input-field" placeholder={t('auth.emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full">
@@ -66,12 +67,12 @@ export default function ForgotPassword() {
         {step === 2 && (
           <form onSubmit={handleReset} className="space-y-4">
             <div>
-              <label className="label-text">{t('auth.resetToken')}</label>
+              <label className="mb-2 block text-sm font-semibold text-[#35443a]">{t('auth.resetToken')}</label>
               <input type="text" className="input-field" placeholder={t('auth.enterToken')} value={resetToken} onChange={(e) => setResetToken(e.target.value)} required />
               <p className="text-xs text-gray-500 mt-1">{t('auth.checkEmailOrConsole')}</p>
             </div>
             <div>
-              <label className="label-text">{t('auth.newPassword')}</label>
+              <label className="mb-2 block text-sm font-semibold text-[#35443a]">{t('auth.newPassword')}</label>
               <input type="password" className="input-field" placeholder={t('auth.newPasswordPlaceholder')} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full">
@@ -88,7 +89,7 @@ export default function ForgotPassword() {
         )}
 
         <div className="mt-6 text-center text-sm">
-          <Link to="/login" className="text-brand-600 hover:text-brand-800 font-medium">{t('auth.backToLogin')}</Link>
+          <Link to="/login" className="font-bold text-brand-600 hover:text-brand-800">{t('auth.backToLogin')}</Link>
         </div>
       </div>
     </div>

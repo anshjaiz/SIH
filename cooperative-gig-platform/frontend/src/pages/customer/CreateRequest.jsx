@@ -1,12 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import LocationPicker from '../../components/LocationPicker';
 
+const EMERGENCY_TYPES = [
+  { value: 'Electrical emergency', key: 'electrical' },
+  { value: 'Water leakage', key: 'waterLeakage' },
+  { value: 'Pipe burst', key: 'pipeBurst' },
+  { value: 'Lockout', key: 'lockout' },
+  { value: 'Urgent caregiving', key: 'urgentCaregiving' },
+  { value: 'Other', key: 'other' },
+];
+
+const TIME_SLOTS = [
+  { value: 'Morning', labelKey: 'morning' },
+  { value: 'Afternoon', labelKey: 'afternoon' },
+  { value: 'Evening', labelKey: 'evening' },
+  { value: 'Flexible', labelKey: 'flexible' },
+];
+
 export default function CreateRequest() {
   const { serviceId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [service, setService] = useState(null);
   const [form, setForm] = useState({
     description: '',
@@ -28,11 +46,11 @@ export default function CreateRequest() {
         const res = await api.get(`/services/${serviceId}`);
         setService(res.data);
       } catch (e) {
-        toast.error('Service not found');
+        toast.error(t('toast.serviceNotFound'));
       }
     };
     load();
-  }, [serviceId]);
+  }, [serviceId, t]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -62,7 +80,7 @@ export default function CreateRequest() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!serviceId) { toast.error('Please select a service first'); return; }
+    if (!serviceId) { toast.error(t('create.selectServiceFirst')); return; }
     setLoading(true);
     try {
       const payload = {
@@ -91,47 +109,51 @@ export default function CreateRequest() {
         }).catch(() => {});
       }
 
-      toast.success('Service request created!');
+      toast.success(t('create.successToast'));
       navigate(`/customer/bookings/${res.data.booking._id}`);
     } catch (err) {
-      toast.error(err.message || 'Failed to create request');
+      toast.error(err.message || t('toast.createFailed'));
     }
     setLoading(false);
   };
 
   const locationValue = { address: form.address, city: form.city, lat: form.lat, lng: form.lng };
 
+  const getSlotLabel = (slot) => {
+    const match = TIME_SLOTS.find((s) => slot.startsWith(s.value));
+    return match ? t(`create.timeSlots.${match.labelKey}`, slot) : slot;
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-900 mb-6">Create Service Request</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-6">{t('create.title')}</h2>
 
       {service && (
         <div className="card mb-6">
           <h3 className="font-semibold">{service.name}</h3>
-          <p className="text-sm text-gray-500">{service.category} • ₹{service.basePrice} base</p>
+          <p className="text-sm text-gray-500">{service.category} • ₹{service.basePrice} {t('common.base')}</p>
         </div>
       )}
 
       {!serviceId && (
         <div className="card mb-6">
-          <p className="text-gray-500">Please select a service first</p>
+          <p className="text-gray-500">{t('create.selectServiceFirst')}</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="card space-y-5">
         <div>
-          <label className="label-text">Describe the problem</label>
+          <label className="label-text">{t('create.describeProblem')}</label>
           <textarea
             name="description"
             className="input-field"
             rows={4}
-            placeholder="e.g., My kitchen pipe is leaking. The water is coming from under the sink..."
+            placeholder={t('create.problemPlaceholder')}
             value={form.description}
             onChange={handleChange}
           />
         </div>
 
-        {/* Emergency toggle */}
         <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
           <input
             type="checkbox"
@@ -141,28 +163,25 @@ export default function CreateRequest() {
             className="w-4 h-4 text-orange-600 rounded"
           />
           <div>
-            <p className="font-medium text-orange-800 text-sm">⚡ This is an emergency</p>
-            <p className="text-xs text-orange-600">Emergency requests get priority matching</p>
+            <p className="font-medium text-orange-800 text-sm">{t('create.isEmergency')}</p>
+            <p className="text-xs text-orange-600">{t('create.emergencyHint')}</p>
           </div>
         </div>
 
         {form.isEmergency && (
           <div>
-            <label className="label-text">Emergency type</label>
+            <label className="label-text">{t('create.emergencyType')}</label>
             <select name="emergencyType" className="input-field" value={form.emergencyType} onChange={handleChange}>
-              <option value="">Select type</option>
-              <option value="Electrical emergency">Electrical emergency</option>
-              <option value="Water leakage">Water leakage</option>
-              <option value="Pipe burst">Pipe burst</option>
-              <option value="Lockout">Lockout</option>
-              <option value="Urgent caregiving">Urgent caregiving</option>
-              <option value="Other">Other urgent household problem</option>
+              <option value="">{t('create.selectType')}</option>
+              {EMERGENCY_TYPES.map((et) => (
+                <option key={et.value} value={et.value}>{t(`create.emergencyOptions.${et.key}`)}</option>
+              ))}
             </select>
           </div>
         )}
 
         <div className="space-y-1">
-          <label className="label-text">Address / Location</label>
+          <label className="label-text">{t('create.address')}</label>
           <LocationPicker
             value={locationValue}
             onChange={(v) => setForm({ ...form, address: v.address || '', city: v.city || '', lat: String(v.lat), lng: String(v.lng) })}
@@ -171,7 +190,7 @@ export default function CreateRequest() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label-text">Preferred Date</label>
+            <label className="label-text">{t('create.preferredDate')}</label>
             <input
               type="date"
               name="requestedDate"
@@ -182,36 +201,35 @@ export default function CreateRequest() {
             />
           </div>
           <div>
-            <label className="label-text">Time Slot</label>
+            <label className="label-text">{t('create.timeSlot')}</label>
             <select name="timeSlot" className="input-field" value={form.timeSlot} onChange={handleChange}>
-              <option>Morning (9AM-12PM)</option>
-              <option>Afternoon (12PM-4PM)</option>
-              <option>Evening (4PM-8PM)</option>
-              <option>Flexible</option>
+              {TIME_SLOTS.map((s) => (
+                <option key={s.value} value={s.value}>{getSlotLabel(s.value)}</option>
+              ))}
             </select>
           </div>
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className="font-semibold text-gray-900">Service Charge</p>
+            <p className="font-semibold text-gray-900">{t('create.serviceCharge')}</p>
             <p className="font-semibold text-brand-600">₹{service?.basePrice || 0}</p>
           </div>
           <div className="flex items-center justify-between mb-1">
-            <p className="text-sm text-gray-600">Platform / App Fee</p>
-            <p className="text-sm text-gray-600">Included</p>
+            <p className="text-sm text-gray-600">{t('create.platformFee')}</p>
+            <p className="text-sm text-gray-600">{t('common.included')}</p>
           </div>
           <div className="flex items-center justify-between border-t border-gray-100 pt-2">
-            <p className="font-semibold text-gray-900">Total</p>
+            <p className="font-semibold text-gray-900">{t('common.total')}</p>
             <p className="font-bold text-brand-600">₹{service?.basePrice || 0}</p>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            No material cost is charged now. If materials are needed, your worker will send an approval request after visiting.
+            {t('create.materialNote')}
           </p>
         </div>
 
         <button type="submit" disabled={loading || !serviceId} className="btn-primary w-full">
-          {loading ? 'Creating...' : 'Submit Request'}
+          {loading ? t('create.creating') : t('create.submitRequest')}
         </button>
       </form>
     </div>

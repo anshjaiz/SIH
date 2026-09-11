@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getSocket } from '../../services/socket';
 import api from '../../services/api';
 
@@ -24,6 +25,7 @@ const REQ_STATUS_BADGE = {
 };
 
 export default function MySentRequests() {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -55,40 +57,40 @@ export default function MySentRequests() {
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-gray-900">📨 Your collaboration requests</h3>
+      <h3 className="font-semibold text-gray-900">📨 {t('collab.yourRequests', 'Your collaboration requests')}</h3>
       {requests.map((r) => {
         const accepted = (r.candidates || []).filter((c) => c.status === 'ACCEPTED').length;
         const need = Math.max((r.numberOfCollaborators || 1) - accepted, 0);
         const booking = r.booking || {};
-        const leadName = r.leadWorker?.user?.name || 'You';
+        const leadName = r.leadWorker?.user?.name || t('collab.you', 'You');
         return (
           <div key={r._id} className="card">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h4 className="font-semibold text-gray-900">{booking.service || 'Job'}</h4>
+                <h4 className="font-semibold text-gray-900">{booking.service || t('collab.jobFallback', 'Job')}</h4>
                 <p className="text-sm text-gray-500">{booking.bookingNumber} · {r._id.toString().slice(-6)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`badge ${REQ_STATUS_BADGE[r.status]}`}>{r.status}</span>
                 {r.status === 'OPEN' && (
-                  <span className="badge bg-amber-100 text-amber-700">Need {need} more</span>
+                  <span className="badge bg-amber-100 text-amber-700">{t('collab.needMore', 'Need {{n}} more', { n: need })}</span>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3">
-              <div>🧰 Role: {r.role}</div>
+              <div>🧰 {t('collab.roleLabel', 'Role:')} {r.role}</div>
               <div>📅 {fmtDate(r.date)} · {r.startTime} · {r.durationHours}h</div>
               <div className="col-span-2">📍 {r.city || 'Hyderabad'} · {r.address}</div>
-              <div className="col-span-2 font-medium text-brand-700">💰 Estimated earning ₹{r.estimatedPayment}</div>
+              <div className="col-span-2 font-medium text-brand-700">💰 {t('collab.estimatedEarning', 'Estimated earning ₹{{amount}}', { amount: r.estimatedPayment })}</div>
             </div>
 
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Invited workers <span className="normal-case font-normal">({accepted} of {r.numberOfCollaborators || 1} accepted)</span>
+              {t('collab.invitedWorkers', 'Invited workers')} <span className="normal-case font-normal">({t('collab.acceptedOf', '{{accepted}} of {{total}} accepted', { accepted, total: r.numberOfCollaborators || 1 })})</span>
             </div>
             <div className="space-y-1.5">
               {(r.candidates || []).map((c, i) => {
-                const name = c.worker?.user?.name || 'Worker';
+                const name = c.worker?.user?.name || t('collab.workerFallback', 'Worker');
                 return (
                   <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                     <span className="text-sm text-gray-700">
@@ -101,7 +103,7 @@ export default function MySentRequests() {
               })}
             </div>
             {r.leadWorker && (
-              <p className="text-xs text-gray-400 mt-3">Requested by {leadName}</p>
+              <p className="text-xs text-gray-400 mt-3">{t('collab.requestedBy', 'Requested by {{name}}', { name: leadName })}</p>
             )}
             {r.instructions && (
               <p className="text-xs text-gray-500 mt-1 italic">"{r.instructions}"</p>

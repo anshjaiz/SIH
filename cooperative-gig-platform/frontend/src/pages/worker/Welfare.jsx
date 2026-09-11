@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { HiOutlineShieldCheck, HiOutlineAcademicCap, HiOutlineCurrencyRupee, HiOutlineHeart } from 'react-icons/hi';
 
 export default function Welfare() {
+  const { t } = useTranslation();
   const [welfare, setWelfare] = useState(null);
   const [trainings, setTrainings] = useState([]);
   const [myTrainings, setMyTrainings] = useState([]);
@@ -29,11 +31,11 @@ export default function Welfare() {
   const handleEnroll = async (trainingId) => {
     try {
       await api.post('/workers/trainings/enroll', { trainingId });
-      toast.success('Enrolled!');
+      toast.success(t('toast.enrolled', 'Enrolled!'));
       const res = await api.get('/workers/trainings/my');
       setMyTrainings(res.data || []);
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.failed', 'Failed'));
     }
   };
 
@@ -45,7 +47,7 @@ export default function Welfare() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Welfare & Training</h2>
+      <h2 className="text-xl font-bold text-gray-900">{t('welfare.title', 'Welfare & Training')}</h2>
 
       {/* Welfare overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -55,7 +57,7 @@ export default function Welfare() {
               <HiOutlineShieldCheck className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Insurance</p>
+              <p className="text-sm text-gray-500">{t('welfare.insurance', 'Insurance')}</p>
               <p className={`font-bold ${insurance.type === 'ACTIVE' ? 'text-green-600' : 'text-red-500'}`}>
                 {insurance.type || 'INACTIVE'}
               </p>
@@ -69,7 +71,7 @@ export default function Welfare() {
               <HiOutlineCurrencyRupee className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Cooperative Fund</p>
+              <p className="text-sm text-gray-500">{t('welfare.coopFund', 'Cooperative Fund')}</p>
               <p className="font-bold">₹{(welfare?.cooperativeFundBalance || 0).toLocaleString()}</p>
             </div>
           </div>
@@ -81,7 +83,7 @@ export default function Welfare() {
               <HiOutlineAcademicCap className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Trainings Completed</p>
+              <p className="text-sm text-gray-500">{t('welfare.trainingsCompleted', 'Trainings Completed')}</p>
               <p className="font-bold">{myTrainings.filter(t => t.status === 'COMPLETED' || t.status === 'CERTIFIED').length}</p>
             </div>
           </div>
@@ -93,7 +95,7 @@ export default function Welfare() {
               <HiOutlineHeart className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Emergency Fund</p>
+              <p className="text-sm text-gray-500">{t('welfare.emergencyFund', 'Emergency Fund')}</p>
               <p className="font-bold">₹{(welfare?.emergencyFund || 0).toLocaleString()}</p>
             </div>
           </div>
@@ -102,7 +104,7 @@ export default function Welfare() {
 
       {/* Welfare schemes */}
       <div className="card">
-        <h3 className="font-semibold mb-4">Welfare Schemes</h3>
+        <h3 className="font-semibold mb-4">{t('welfare.schemes', 'Welfare Schemes')}</h3>
         {welfare?.schemesEnrolled?.length > 0 ? (
           <div className="space-y-3">
             {welfare.schemesEnrolled.map((scheme, i) => (
@@ -119,8 +121,8 @@ export default function Welfare() {
           </div>
         ) : (
           <div className="text-center py-8 text-gray-400">
-            <p>No schemes enrolled yet</p>
-            <p className="text-xs mt-1">Contact cooperative admin for enrollment</p>
+            <p>{t('welfare.noSchemes', 'No schemes enrolled yet')}</p>
+            <p className="text-xs mt-1">{t('welfare.contactAdmin', 'Contact cooperative admin for enrollment')}</p>
           </div>
         )}
       </div>
@@ -128,14 +130,14 @@ export default function Welfare() {
       {/* My Training */}
       {myTrainings.length > 0 && (
         <div className="card">
-          <h3 className="font-semibold mb-4">My Enrolled Trainings</h3>
+          <h3 className="font-semibold mb-4">{t('welfare.myTrainings', 'My Enrolled Trainings')}</h3>
           <div className="space-y-3">
             {myTrainings.map((enr) => (
               <div key={enr._id} className="p-3 bg-blue-50 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium text-sm">{enr.training?.title || 'Training'}</p>
-                    <p className="text-xs text-gray-500">Enrolled: {new Date(enr.createdAt).toLocaleDateString()}</p>
+                    <p className="font-medium text-sm">{enr.training?.title || t('welfare.trainingFallback', 'Training')}</p>
+                    <p className="text-xs text-gray-500">{t('welfare.enrolledOn', 'Enrolled:')} {new Date(enr.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
                     <span className={`badge ${
@@ -152,30 +154,30 @@ export default function Welfare() {
 
       {/* Available Training */}
       <div className="card">
-        <h3 className="font-semibold mb-4">Available Training Programs</h3>
+        <h3 className="font-semibold mb-4">{t('welfare.availableTraining', 'Available Training Programs')}</h3>
         {trainings.length === 0 ? (
-          <p className="text-gray-400 text-sm">No training programs available</p>
+          <p className="text-gray-400 text-sm">{t('welfare.noTraining', 'No training programs available')}</p>
         ) : (
           <div className="space-y-3">
-            {trainings.map((t) => {
-              const enrolled = myTrainings.some((mt) => mt.training?._id === t._id);
+            {trainings.map((tr) => {
+              const enrolled = myTrainings.some((mt) => mt.training?._id === tr._id);
               return (
-                <div key={t._id} className="p-4 bg-gray-50 rounded-lg flex items-center justify-between">
+                <div key={tr._id} className="p-4 bg-gray-50 rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="font-medium">{t.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">{t.description?.slice(0, 100)}</p>
+                    <p className="font-medium">{tr.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">{tr.description?.slice(0, 100)}</p>
                     <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                      <span>📂 {t.category || 'General'}</span>
-                      <span>⏱ {t.duration || 'Self-paced'}</span>
-                      <span>💻 {t.mode}</span>
+                      <span>📂 {tr.category || t('welfare.general', 'General')}</span>
+                      <span>⏱ {tr.duration || t('welfare.selfPaced', 'Self-paced')}</span>
+                      <span>💻 {tr.mode}</span>
                     </div>
                   </div>
                   <button
-                    onClick={() => handleEnroll(t._id)}
+                    onClick={() => handleEnroll(tr._id)}
                     disabled={enrolled}
                     className={`text-sm px-3 py-1.5 rounded-lg ${enrolled ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-brand-600 text-white hover:bg-brand-700'}`}
                   >
-                    {enrolled ? 'Enrolled ✓' : 'Enroll'}
+                    {enrolled ? t('welfare.enrolledBtn', 'Enrolled ✓') : t('welfare.enroll', 'Enroll')}
                   </button>
                 </div>
               );

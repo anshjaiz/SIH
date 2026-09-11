@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import StatsCard from '../../components/StatsCard';
 import MapComponent from '../../components/MapComponent';
@@ -10,6 +11,7 @@ import {
 import { HiOutlineMapPin } from 'react-icons/hi2';
 
 export default function CustomerDashboard() {
+  const { t } = useTranslation();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,59 +41,55 @@ export default function CustomerDashboard() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Welcome back!</h2>
+      <h2 className="text-xl font-bold text-gray-900">{t('dashC.welcomeBack')}</h2>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Total Bookings" value={stats.totalBookings} icon={HiOutlineBriefcase} color="brand" />
-        <StatsCard title="Total Spent" value={`₹${(stats.totalSpending || 0).toLocaleString()}`} icon={HiOutlineCurrencyRupee} color="success" />
-        <StatsCard title="Completed" value={stats.completedBookings} icon={HiOutlineCheckCircle} color="success" />
-        <StatsCard title="Upcoming" value={upcoming ? 1 : 0} icon={HiOutlineClock} color="warning" />
+        <StatsCard title={t('dashC.totalBookings')} value={stats.totalBookings} icon={HiOutlineBriefcase} color="brand" />
+        <StatsCard title={t('dashC.totalSpent')} value={`₹${(stats.totalSpending || 0).toLocaleString()}`} icon={HiOutlineCurrencyRupee} color="success" />
+        <StatsCard title={t('dashC.completed')} value={stats.completedBookings} icon={HiOutlineCheckCircle} color="success" />
+        <StatsCard title={t('dashC.upcoming')} value={upcoming ? 1 : 0} icon={HiOutlineClock} color="warning" />
       </div>
 
-      {/* Active Job / Upcoming */}
       {(activeJob || upcoming) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {activeJob && (
             <div className="card border-l-4 border-green-500">
-              <h3 className="font-semibold text-green-700 mb-2">Active Job</h3>
+              <h3 className="font-semibold text-green-700 mb-2">{t('dashC.activeJob')}</h3>
               <p className="font-medium">{activeJob.service?.name}</p>
-              <p className="text-sm text-gray-500">Status: {activeJob.status}</p>
+              <p className="text-sm text-gray-500">{t('dashC.statusLabel', { status: activeJob.status })}</p>
               <Link to={`/customer/bookings/${activeJob._id}`} className="btn-primary text-sm mt-3 inline-block">
-                Track Job →
+                {t('dashC.trackJob')} →
               </Link>
             </div>
           )}
           {upcoming && (
             <div className="card border-l-4 border-blue-500">
-              <h3 className="font-semibold text-blue-700 mb-2">Upcoming Booking</h3>
+              <h3 className="font-semibold text-blue-700 mb-2">{t('dashC.upcomingBooking')}</h3>
               <p className="font-medium">{upcoming.service?.name}</p>
               <p className="text-sm text-gray-500">
-                Date: {new Date(upcoming.requestedDate).toLocaleDateString()}
+                {t('common.date')}: {new Date(upcoming.requestedDate).toLocaleDateString()}
               </p>
               <Link to={`/customer/bookings/${upcoming._id}`} className="btn-primary text-sm mt-3 inline-block">
-                View Booking →
+                {t('dashC.viewBooking')} →
               </Link>
             </div>
           )}
         </div>
       )}
 
-      {/* Quick Service Request */}
       <div className="card bg-gradient-to-r from-brand-600 to-brand-800 text-white">
-        <h3 className="font-semibold mb-2">Need a service?</h3>
-        <p className="text-sm text-blue-100 mb-4">Find verified workers near you instantly</p>
+        <h3 className="font-semibold mb-2">{t('create.needService')}</h3>
+        <p className="text-sm text-blue-100 mb-4">{t('create.findNearby')}</p>
         <Link to="/customer/services" className="btn-accent inline-block">
-          Browse Services
+          {t('create.browseServices')}
         </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recommended Services */}
         <div className="card">
-          <h3 className="font-semibold mb-4">Recommended Services</h3>
+          <h3 className="font-semibold mb-4">{t('dashC.recommended')}</h3>
           {recommended.length === 0 ? (
-            <p className="text-gray-400 text-sm">No services yet</p>
+            <p className="text-gray-400 text-sm">{t('dashC.noServices')}</p>
           ) : (
             <div className="space-y-3">
               {recommended.map((svc) => (
@@ -102,7 +100,7 @@ export default function CustomerDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-brand-600">₹{svc.basePrice}</p>
-                    <Link to={`/customer/services/request/${svc._id}`} className="text-xs text-brand-600 hover:underline">Book now</Link>
+                    <Link to={`/customer/services/request/${svc._id}`} className="text-xs text-brand-600 hover:underline">{t('dashC.bookNow')}</Link>
                   </div>
                 </div>
               ))}
@@ -110,11 +108,10 @@ export default function CustomerDashboard() {
           )}
         </div>
 
-        {/* Previous Jobs */}
         <div className="card">
-          <h3 className="font-semibold mb-4">Recent Jobs</h3>
+          <h3 className="font-semibold mb-4">{t('dashC.recentJobs')}</h3>
           {previousJobs.length === 0 ? (
-            <p className="text-gray-400 text-sm">No previous jobs</p>
+            <p className="text-gray-400 text-sm">{t('dashC.noPreviousJobs')}</p>
           ) : (
             <div className="space-y-3">
               {previousJobs.map((job) => (
@@ -140,12 +137,11 @@ export default function CustomerDashboard() {
         </div>
       </div>
 
-      {/* Nearby Workers */}
       {nearby.length > 0 && (
         <div className="card">
           <h3 className="font-semibold mb-4">
             <HiOutlineMapPin className="w-4 h-4 inline mr-1" />
-            Nearby Verified Workers
+            {t('nav.ping')}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {nearby.map((worker) => (
@@ -157,12 +153,12 @@ export default function CustomerDashboard() {
                   <div>
                     <p className="font-medium text-sm">{worker.user?.name}</p>
                     <p className="text-xs text-gray-500">
-                      ⭐ {worker.rating?.toFixed(1)} • {worker.completedJobs} jobs
+                      ⭐ {worker.rating?.toFixed(1)} • {worker.completedJobs} {t('common.jobs')}
                     </p>
                   </div>
                 </div>
                 {worker.distanceKm && (
-                  <p className="text-xs text-gray-500">~{worker.distanceKm} km away</p>
+                  <p className="text-xs text-gray-500">~{worker.distanceKm} {t('common.kmAway')}</p>
                 )}
               </div>
             ))}

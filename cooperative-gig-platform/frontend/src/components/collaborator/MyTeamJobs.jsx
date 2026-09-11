@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { getMyTeamJobs, checkInToTeam } from '../../services/collaboratorService';
@@ -24,6 +25,7 @@ const BOOKING_COLORS = {
 };
 
 export default function MyTeamJobs() {
+  const { t } = useTranslation();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkingId, setCheckingId] = useState(null);
@@ -64,10 +66,10 @@ export default function MyTeamJobs() {
     setCheckingId(job.teamId);
     try {
       const res = await checkInToTeam(job.teamId);
-      toast.success(res.message || 'Checked in!');
+      toast.success(res.message || t('toast.checkedIn', 'Checked in!'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed to check in');
+      toast.error(err.message || t('toast.failedCheckIn', 'Failed to check in'));
     }
     setCheckingId(null);
   };
@@ -78,7 +80,7 @@ export default function MyTeamJobs() {
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-gray-900">✅ My team jobs</h3>
+      <h3 className="font-semibold text-gray-900">✅ {t('collab.myTeamJobs', 'My team jobs')}</h3>
       {jobs.map((job) => (
         <div key={job.teamId} className="card">
           <div className="flex items-center justify-between mb-3">
@@ -87,9 +89,9 @@ export default function MyTeamJobs() {
               <p className="text-sm text-gray-500">{job.booking?.bookingNumber}</p>
             </div>
             {job.completed ? (
-              <span className="badge bg-gray-200 text-gray-700">Completed</span>
+              <span className="badge bg-gray-200 text-gray-700">{t('collab.completed', 'Completed')}</span>
             ) : job.joinedAt ? (
-              <span className="badge bg-green-100 text-green-700">✓ Checked in</span>
+              <span className="badge bg-green-100 text-green-700">✓ {t('collab.checkedIn', 'Checked in')}</span>
             ) : (
               <span className={`badge px-3 py-1 ${BOOKING_COLORS[job.booking?.status]}`}>{job.booking?.status}</span>
             )}
@@ -97,16 +99,16 @@ export default function MyTeamJobs() {
 
           <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 mb-3">
             <div>
-              <p className="font-medium">Lead: {job.lead?.name}</p>
+              <p className="font-medium">{t('collab.lead', 'Lead:')} {job.lead?.name}</p>
               <p>📞 {job.lead?.phone}</p>
             </div>
             <div>
-              <p className="font-medium">Customer: {job.booking?.customer?.name}</p>
+              <p className="font-medium">{t('collab.customerLabel', 'Customer:')} {job.booking?.customer?.name}</p>
               <p>📞 {job.booking?.customer?.phone}</p>
             </div>
             <div className="col-span-2">📍 {job.booking?.address}, {job.booking?.city}</div>
-            <div>🧰 Your role: {job.myRole}</div>
-            <div>💰 Your pay: ₹{job.paymentEstimate}</div>
+            <div>🧰 {t('collab.yourRole', 'Your role:')} {job.myRole}</div>
+            <div>💰 {t('collab.yourPay', 'Your pay:')} ₹{job.paymentEstimate}</div>
             {job.schedule && (
               <>
                 <div>📅 {fmtDate(job.schedule.date)}</div>
@@ -124,11 +126,11 @@ export default function MyTeamJobs() {
               disabled={checkingId === job.teamId}
               className="btn-primary w-full"
             >
-              {checkingId === job.teamId ? 'Checking in…' : '🚗 On my way — Check in'}
+              {checkingId === job.teamId ? t('collab.checkingIn', 'Checking in…') : t('collab.checkInBtn', '🚗 On my way — Check in')}
             </button>
           )}
           {job.joinedAt && (
-            <p className="text-xs text-gray-400">Checked in {fmtTime(job.joinedAt)} — reach on time and stay safe.</p>
+            <p className="text-xs text-gray-400">{t('collab.checkedInMsg', 'Checked in {{time}} — reach on time and stay safe.', { time: fmtTime(job.joinedAt) })}</p>
           )}
         </div>
       ))}

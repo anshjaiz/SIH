@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -15,6 +16,7 @@ const STATUS = {
 };
 
 export default function PaymentHistory() {
+  const { t } = useTranslation();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -25,7 +27,7 @@ export default function PaymentHistory() {
       setPayments(res.data || []);
       setTotal((res.data || []).reduce((s, p) => s + (p.status === 'PAID' || p.status === 'SUCCESS' ? p.amount : 0), 0));
     } catch (err) {
-      toast.error(err.message || 'Could not load payments');
+      toast.error(err.message || t('toast.loadPaymentsFail', 'Could not load payments'));
     } finally {
       setLoading(false);
     }
@@ -40,17 +42,17 @@ export default function PaymentHistory() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-gray-900">My Payments</h2>
+        <h2 className="text-xl font-bold text-gray-900">{t('pay.myPayments', 'My Payments')}</h2>
         <div className="badge bg-brand-50 text-brand-700 px-4 py-2 text-sm font-semibold">
-          Total paid: {inr(total)}
+          {t('pay.totalPaid', 'Total paid: {{amt}}', { amt: inr(total) })}
         </div>
       </div>
 
       {payments.length === 0 ? (
         <div className="card text-center py-16">
           <p className="text-4xl mb-3">💸</p>
-          <p className="text-gray-500">No payments yet.</p>
-          <p className="text-sm text-gray-400 mt-1">When you pay for a booking, your payment history will appear here.</p>
+          <p className="text-gray-500">{t('pay.noPayments', 'No payments yet.')}</p>
+          <p className="text-sm text-gray-400 mt-1">{t('pay.emptyHint', 'When you pay for a booking, your payment history will appear here.')}</p>
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
@@ -58,18 +60,18 @@ export default function PaymentHistory() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
                 <tr>
-                  <th className="px-5 py-3">Service</th>
-                  <th className="px-5 py-3">Booking</th>
-                  <th className="px-5 py-3">Date</th>
-                  <th className="px-5 py-3">Method</th>
-                  <th className="px-5 py-3 text-right">Amount</th>
-                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">{t('pay.colService', 'Service')}</th>
+                  <th className="px-5 py-3">{t('pay.colBooking', 'Booking')}</th>
+                  <th className="px-5 py-3">{t('pay.colDate', 'Date')}</th>
+                  <th className="px-5 py-3">{t('pay.colMethod', 'Method')}</th>
+                  <th className="px-5 py-3 text-right">{t('pay.colAmount', 'Amount')}</th>
+                  <th className="px-5 py-3">{t('pay.colStatus', 'Status')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {payments.map((p) => (
                   <tr key={p._id} className="hover:bg-gray-50/60">
-                    <td className="px-5 py-3 font-medium">{p.booking?.serviceSnapshot?.name || 'Service'}</td>
+                    <td className="px-5 py-3 font-medium">{p.booking?.serviceSnapshot?.name || t('pay.fallbackService', 'Service')}</td>
                     <td className="px-5 py-3 text-gray-500">{p.booking?.bookingNumber || '—'}</td>
                     <td className="px-5 py-3 text-gray-500">
                       {p.paidAt || p.paymentDate ? new Date(p.paidAt || p.paymentDate).toLocaleDateString() : '—'}
@@ -82,7 +84,7 @@ export default function PaymentHistory() {
                     <td className="px-5 py-3">
                       <span className={`badge ${STATUS[p.status] || 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
                       {p.status === 'PAID' && p.transactionId && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">Txn: {p.transactionId}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{t('pay.txn', 'Txn: {{id}}', { id: p.transactionId })}</p>
                       )}
                     </td>
                   </tr>
@@ -94,8 +96,7 @@ export default function PaymentHistory() {
       )}
 
       <p className="text-xs text-gray-400">
-        Every payment is processed on the platform&apos;s secure gateway and verified server-side. Worker earnings are only
-        released after you confirm the job is complete.
+        {t('pay.footer', "Every payment is processed on the platform's secure gateway and verified server-side. Worker earnings are only released after you confirm the job is complete.")}
       </p>
     </div>
   );

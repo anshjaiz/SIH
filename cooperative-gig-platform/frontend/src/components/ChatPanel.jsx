@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 
 const fmtTime = (d) => {
@@ -14,6 +15,7 @@ const fmtTime = (d) => {
 
 export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [messages, setMessages] = useState([]);
   const [otherName, setOtherName] = useState('Worker');
   const [text, setText] = useState('');
@@ -28,7 +30,7 @@ export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
       setMessages(res.data.messages || []);
       setOtherName(res.data.otherName || 'Worker');
     } catch (e) {
-      if (e.status !== 401) toast.error(e.message || 'Could not load messages');
+      if (e.status !== 401) toast.error(e.message || t('chatp.couldNotLoad'));
     }
   };
 
@@ -69,7 +71,7 @@ export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
       }
       setText('');
     } catch (e) {
-      toast.error(e.message || 'Could not send message');
+      toast.error(e.message || t('chatp.couldNotSend'));
     } finally {
       setSending(false);
     }
@@ -86,7 +88,7 @@ export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
           <div>
             <h3 className="font-semibold text-gray-900 text-sm">💬 {otherName}</h3>
             {bookingNumber && (
-              <p className="text-[11px] text-gray-400">Job {bookingNumber}</p>
+              <p className="text-[11px] text-gray-400">{t('chatp.jobNumber', { number: bookingNumber })}</p>
             )}
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
@@ -96,7 +98,7 @@ export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 bg-gray-50">
           {messages.length === 0 && (
             <p className="text-center text-sm text-gray-400 mt-10">
-              No messages yet. Say hello and coordinate the job.
+              {t('chatp.noMessages')}
             </p>
           )}
           {messages.map((m) => {
@@ -123,7 +125,7 @@ export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
             }}
-            placeholder="Write a message…"
+            placeholder={t('chatp.placeholder')}
             rows={2}
             className="flex-1 resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
@@ -132,7 +134,7 @@ export default function ChatPanel({ bookingId, open, onClose, bookingNumber }) {
             disabled={!text.trim() || sending}
             className="btn-primary shrink-0 px-4 py-2 rounded-xl"
           >
-            {sending ? '…' : 'Send'}
+            {sending ? '…' : t('chatp.send')}
           </button>
         </div>
       </div>

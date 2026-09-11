@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { getSocket } from '../../services/socket';
@@ -9,6 +10,7 @@ import ChatPanel from '../../components/ChatPanel';
 import NavigationPanel from '../../components/worker/NavigationPanel';
 
 export default function ActiveJobs() {
+  const { t } = useTranslation();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState({});
@@ -115,10 +117,10 @@ export default function ActiveJobs() {
   const handleStatus = async (id, status) => {
     try {
       await api.post(`/workers/jobs/${id}/status`, { status });
-      toast.success(`Status updated to ${status}`);
+      toast.success(t('toast.statusUpdated'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
@@ -130,20 +132,20 @@ export default function ActiveJobs() {
   const handleComplete = async (id) => {
     try {
       await api.post(`/workers/jobs/${id}/complete`);
-      toast.success('Job completed!');
+      toast.success(t('toast.jobCompleted'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
   const handleArrive = async (id) => {
     try {
       await api.post(`/workers/jobs/${id}/arrive`);
-      toast.success('Arrival recorded');
+      toast.success(t('toast.arrivedUpdated'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
@@ -156,7 +158,7 @@ export default function ActiveJobs() {
     e.preventDefault();
     const amount = parseFloat(materialForm.amount);
     if (!materialForm.description.trim() || !amount || amount <= 0) {
-      toast.error('Material name and a positive amount are required');
+      toast.error(t('active.materialValidation'));
       return;
     }
     setMaterialSubmitting(true);
@@ -166,11 +168,11 @@ export default function ActiveJobs() {
         amount,
         note: materialForm.note.trim(),
       });
-      toast.success('Material cost request sent — awaiting customer approval');
+      toast.success(t('active.materialSent'));
       setMaterialJob(null);
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed to submit material request');
+      toast.error(err.message || t('active.materialSubmitFailed'));
     } finally {
       setMaterialSubmitting(false);
     }
@@ -194,12 +196,12 @@ export default function ActiveJobs() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Active Jobs</h2>
+      <h2 className="text-xl font-bold text-gray-900">{t('active.title')}</h2>
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div></div>
       ) : jobs.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">No active jobs</div>
+        <div className="text-center py-20 text-gray-400">{t('active.noActiveJobs')}</div>
       ) : (
         <div className="space-y-4">
           {jobs.map((job) => (
@@ -209,15 +211,15 @@ export default function ActiveJobs() {
                   <h3 className="font-semibold">{job.serviceSnapshot?.name}</h3>
                   <p className="text-sm text-gray-500">{job.bookingNumber}</p>
                 </div>
-                <span className={`badge px-3 py-1 ${statusColors[job.status]}`}>{job.status}</span>
+                <span className={`badge px-3 py-1 ${statusColors[job.status]}`}>{t(`status.${job.status}`)}</span>
                 {['ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) && (
-                  <span className="badge px-3 py-1 bg-red-100 text-red-700">● Live location ON</span>
+                  <span className="badge px-3 py-1 bg-red-100 text-red-700">● {t('active.liveOn')}</span>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
                 <div>
-                  <p className="font-medium">Customer: {job.customer?.name}</p>
+                  <p className="font-medium">{t('jobs.customer')}: {job.customer?.name}</p>
                   <p>📞 {job.customer?.phone}</p>
                 </div>
                 <div>
@@ -232,48 +234,48 @@ export default function ActiveJobs() {
 
               <div className="flex gap-3">
                   {job.status === 'ASSIGNED' && (
-                    <button onClick={() => handleStatus(job._id, 'ACCEPTED')} className="btn-primary flex-1">✅ Accept</button>
+                    <button onClick={() => handleStatus(job._id, 'ACCEPTED')} className="btn-primary flex-1">✅ {t('jobs.accept')}</button>
                   )}
                   {job.status === 'ACCEPTED' && (
                     <>
-                      <button onClick={() => handleStartNav(job._id)} className="btn-primary flex-1">🚗 Start Navigation (On The Way)</button>
-                      <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 I've Arrived</button>
+                      <button onClick={() => handleStartNav(job._id)} className="btn-primary flex-1">🚗 {t('active.onMyWay')}</button>
+                      <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 {t('active.arrived')}</button>
                     </>
                   )}
                   {job.status === 'ON_THE_WAY' && (
                     <>
-                      <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 I've Arrived</button>
-                      <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 Start Work</button>
+                      <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 {t('active.arrived')}</button>
+                      <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 {t('active.startWork')}</button>
                     </>
                   )}
                   {job.status === 'WORKER_ARRIVED' && (
-                    <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 Start Work</button>
+                    <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 {t('active.startWork')}</button>
                   )}
                   {['STARTED', 'IN_PROGRESS'].includes(job.status) && (
-                    <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ Complete Job</button>
+                    <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ {t('active.completeJob')}</button>
                   )}
                 </div>
 
                 {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) && (
                   <button onClick={() => setChatJob(job)} className="btn-secondary text-sm mt-3 w-full">
-                    💬 Message {job.customer?.name?.split(' ')[0] || 'customer'}
+                    💬 {t('book.messageWorker')}
                   </button>
                 )}
 
                 {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) &&
                   Array.isArray(job.location?.coordinates) && job.location.coordinates.length >= 2 && (
                   <button onClick={() => setNavJob(job)} className="btn-secondary text-sm mt-2 w-full border-brand-200 text-brand-700">
-                    🧭 Navigate to Job
+                    🧭 {t('active.navigateToJob')}
                   </button>
                 )}
 
               {/* Price */}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg text-sm">
-                <div className="flex justify-between"><span>Service Charge</span><span>₹{job.priceBreakdown?.labour || 0}</span></div>
-                <div className="flex justify-between"><span>Materials (approved)</span><span>₹{job.priceBreakdown?.materials || 0}</span></div>
-                <div className="flex justify-between"><span>Platform Fee</span><span>Included</span></div>
+                <div className="flex justify-between"><span>{t('book.serviceCharge2')}</span><span>₹{job.priceBreakdown?.labour || 0}</span></div>
+                <div className="flex justify-between"><span>{t('book.materialCost')} ({t('earn.completed')})</span><span>₹{job.priceBreakdown?.materials || 0}</span></div>
+                <div className="flex justify-between"><span>{t('book.feesNote')}</span><span>{t('common.included')}</span></div>
                 <div className="flex justify-between font-bold border-t mt-1 pt-1">
-                  <span>Total</span><span className="text-brand-600">₹{job.priceBreakdown?.total || 0}</span>
+                  <span>{t('common.total')}</span><span className="text-brand-600">₹{job.priceBreakdown?.total || 0}</span>
                 </div>
               </div>
 
@@ -294,7 +296,7 @@ export default function ActiveJobs() {
                       <div className="flex items-center justify-between">
                         <p className="font-medium">{mr.description}</p>
                         <span className={`badge ${mr.status === 'pending' ? 'badge-warning' : mr.status === 'approved' ? 'badge-success' : 'badge-gray'}`}>
-                          {mr.status === 'pending' ? 'Pending Customer Approval' : mr.status === 'approved' ? 'Approved' : 'Rejected'}
+                          {mr.status === 'pending' ? t('active.pendingApproval') : mr.status === 'approved' ? t('earn.completed') : t('common.cancelled')}
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">₹{mr.amount}{mr.note ? ` • ${mr.note}` : ''}</p>
@@ -306,7 +308,7 @@ export default function ActiveJobs() {
               {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) &&
                 !(job.materialRequests || []).some((mr) => mr.status === 'pending') && (
                   <button onClick={() => openMaterialModal(job)} className="btn-secondary text-sm mt-3 w-full border-brand-200 text-brand-700">
-                    + Add Material Cost
+                    + {t('active.addedMaterialCost')}
                   </button>
                 )}
 
@@ -318,9 +320,9 @@ export default function ActiveJobs() {
                   ) : (requests[job._id] || []).length > 0 ? (
                     <div className="p-4 bg-brand-50 rounded-xl">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-gray-700">📨 Invitations sent to your team</p>
+                        <p className="text-sm font-medium text-gray-700">📨 {t('active.invitationsSent')}</p>
                         <button onClick={() => setRequestingFor(job)} className="text-xs text-brand-600 hover:underline">
-                          + Add more
+                          + {t('active.addMore')}
                         </button>
                       </div>
                       <div className="space-y-2">
@@ -333,7 +335,7 @@ export default function ActiveJobs() {
                               </div>
                               <div className="flex items-center gap-2">
                                 {c.score != null && (
-                                  <span className="text-xs text-gray-500">Match {Math.round(c.score)}%</span>
+                                  <span className="text-xs text-gray-500">{t('active.matchPct', { pct: Math.round(c.score) })}</span>
                                 )}
                                 <span className={`badge px-2 py-0.5 ${
                                   c.status === 'ACCEPTED' ? 'bg-green-100 text-green-700'
@@ -349,17 +351,17 @@ export default function ActiveJobs() {
                         )}
                       </div>
                       <p className="text-[11px] text-gray-400 mt-2">
-                        The worker sees this invite under their <span className="font-medium">Collaborations</span> page.
+                        {t('active.inviteNote')} <span className="font-medium">{t('nav.collaborations')}</span>.
                       </p>
                     </div>
                   ) : teams[job._id] === null ? (
                     <div className="flex items-center justify-between p-3 bg-brand-50 rounded-xl">
-                      <p className="text-sm text-gray-600">👥 No team yet for this job.</p>
+                      <p className="text-sm text-gray-600">👥 {t('active.noTeamYet')}</p>
                       <button
                         onClick={() => setRequestingFor(job)}
                         className="btn-primary text-sm px-3 py-2"
                       >
-                        + Request Collaborator
+                        + {t('active.requestCollab')}
                       </button>
                     </div>
                   ) : null}
@@ -407,25 +409,25 @@ export default function ActiveJobs() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">+ Add Material Cost</h3>
+              <h3 className="font-bold text-gray-900">+ {t('active.addedMaterialCost')}</h3>
               <button onClick={() => setMaterialJob(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={handleSubmitMaterial} className="p-6 space-y-4">
               <p className="text-sm text-gray-500">
-                {materialJob.serviceSnapshot?.name} • Current service charge ₹{materialJob.priceBreakdown?.labour || 0}. The customer must approve any material cost before it is added to your total.
+                {t('active.materialModalNote', { service: materialJob.serviceSnapshot?.name, charge: materialJob.priceBreakdown?.labour || 0 })}
               </p>
               <div>
-                <label className="text-xs font-medium text-gray-600">Material name / description *</label>
+                <label className="text-xs font-medium text-gray-600">{t('active.materialNameLabel')} *</label>
                 <input
                   type="text"
                   className="input-field mt-1"
-                  placeholder="e.g., PVC pipe and connector"
+                  placeholder={t('active.materialNamePlaceholder')}
                   value={materialForm.description}
                   onChange={(e) => setMaterialForm({ ...materialForm, description: e.target.value })}
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">Amount (₹) *</label>
+                <label className="text-xs font-medium text-gray-600">{t('wallet.amount')} (₹) *</label>
                 <input
                   type="number"
                   min={0}
@@ -437,19 +439,19 @@ export default function ActiveJobs() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">Note (optional)</label>
+                <label className="text-xs font-medium text-gray-600">{t('active.materialNote')}</label>
                 <textarea
                   rows={2}
                   className="input-field mt-1"
-                  placeholder="e.g., Needed to replace the old joint as well"
+                  placeholder={t('active.materialNotePlaceholder')}
                   value={materialForm.note}
                   onChange={(e) => setMaterialForm({ ...materialForm, note: e.target.value })}
                 />
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setMaterialJob(null)} className="btn-secondary text-sm">Cancel</button>
+                <button type="button" onClick={() => setMaterialJob(null)} className="btn-secondary text-sm">{t('common.cancel')}</button>
                 <button type="submit" disabled={materialSubmitting} className="btn-primary text-sm">
-                  {materialSubmitting ? 'Submitting…' : 'Submit Request'}
+                  {materialSubmitting ? t('active.submitting') : t('create.submitRequest')}
                 </button>
               </div>
             </form>

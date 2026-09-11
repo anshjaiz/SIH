@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import OtpVerify from '../../components/auth/OtpVerify';
+import LanguageSelector from '../../components/LanguageSelector';
 import toast from 'react-hot-toast';
 
 export default function Register() {
@@ -10,34 +12,34 @@ export default function Register() {
   const [verifyEmail, setVerifyEmail] = useState(null);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.phone || !form.password) {
-      toast.error('Please fill in all fields');
+      toast.error(t('toast.fillAllFields'));
       return;
     }
     if (form.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error(t('toast.passwordMin'));
       return;
     }
     setLoading(true);
     try {
       const result = await register(form);
       if (result.success && result.requiresVerification) {
-        toast.success(result.message || 'Check your email for the verification code');
-        // Send the real address to the API; OtpVerify masks it client-side for display.
+        toast.success(result.message || t('toast.checkEmailCode'));
         setVerifyEmail({ email: form.email.trim().toLowerCase(), role: form.role });
       } else if (result.success) {
-        toast.success('Registration successful!');
+        toast.success(t('toast.registerSuccess'));
         navigate(`/${form.role === 'worker' ? 'worker' : 'customer'}`);
       } else {
-        toast.error(result.message || 'Registration failed');
+        toast.error(result.message || t('toast.registrationFailed'));
       }
     } catch (err) {
-      toast.error(err.message || 'Registration failed');
+      toast.error(err.message || t('toast.registrationFailed'));
     }
     setLoading(false);
   };
@@ -50,6 +52,7 @@ export default function Register() {
   if (verifyEmail) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">
+        <div className="absolute top-4 right-4"><LanguageSelector /></div>
         <OtpVerify
           email={verifyEmail.email}
           onVerified={handleVerified}
@@ -61,19 +64,19 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center p-4">
+      <div className="absolute top-4 right-4"><LanguageSelector /></div>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-100 rounded-xl mb-4">
-            <span className="text-2xl font-bold text-brand-700">AS</span>
+            <span className="text-2xl font-bold text-brand-700">{t('app.shortName')}</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
-          <p className="text-sm text-gray-500 mt-1">Join Aman Seva Cooperative</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('auth.createAccount')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('auth.joinTagline')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Role selection */}
           <div>
-            <label className="label-text">I am a</label>
+            <label className="label-text">{t('auth.iAmA')}</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -84,7 +87,7 @@ export default function Register() {
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
-                🏠 Customer
+                🏠 {t('roles.customer')}
               </button>
               <button
                 type="button"
@@ -95,18 +98,18 @@ export default function Register() {
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
-                🔧 Worker
+                🔧 {t('roles.worker')}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="label-text">Full Name</label>
+            <label className="label-text">{t('auth.fullName')}</label>
             <input
               name="name"
               type="text"
               className="input-field"
-              placeholder="John Doe"
+              placeholder={t('auth.namePlaceholder')}
               value={form.name}
               onChange={handleChange}
               required
@@ -114,12 +117,12 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="label-text">Email</label>
+            <label className="label-text">{t('auth.email')}</label>
             <input
               name="email"
               type="email"
               className="input-field"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
               value={form.email}
               onChange={handleChange}
               required
@@ -127,12 +130,12 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="label-text">Phone</label>
+            <label className="label-text">{t('auth.phone')}</label>
             <input
               name="phone"
               type="tel"
               className="input-field"
-              placeholder="+91 98765 43210"
+              placeholder={t('auth.phonePlaceholder')}
               value={form.phone}
               onChange={handleChange}
               required
@@ -140,12 +143,12 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="label-text">Password</label>
+            <label className="label-text">{t('auth.password')}</label>
             <input
               name="password"
               type="password"
               className="input-field"
-              placeholder="Min 6 characters"
+              placeholder={t('auth.passwordPlaceholder')}
               value={form.password}
               onChange={handleChange}
               required
@@ -161,17 +164,17 @@ export default function Register() {
             {loading ? (
               <>
                 <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
-                Creating account...
+                {t('auth.creatingAccount')}
               </>
             ) : (
-              'Create Account'
+              t('auth.createAccount')
             )}
           </button>
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          Already have an account?{' '}
-          <Link to="/login" className="text-brand-600 font-medium hover:text-brand-800">Sign in</Link>
+          {t('auth.alreadyHaveAccount')}{' '}
+          <Link to="/login" className="text-brand-600 font-medium hover:text-brand-800">{t('auth.signIn')}</Link>
         </div>
       </div>
     </div>

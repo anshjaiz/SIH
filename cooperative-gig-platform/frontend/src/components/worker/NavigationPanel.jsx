@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import MapComponent from '../MapComponent';
@@ -9,17 +10,17 @@ const RECALC_MIN_INTERVAL_MS = 15000; // ...and never more often than this
 
 const NAVIGABLE_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
 
-const gpsErrorMessage = (err) => {
-  if (!err) return 'Unable to determine your current location.';
+const gpsErrorMessage = (err, t) => {
+  if (!err) return t('nav.gpsUnavailable', 'Unable to determine your current location.');
   switch (err.code) {
     case err.PERMISSION_DENIED:
-      return 'Please enable location permission to start navigation.';
+      return t('nav.gpsPermissionDenied', 'Please enable location permission to start navigation.');
     case err.POSITION_UNAVAILABLE:
-      return 'Unable to determine your current location.';
+      return t('nav.gpsUnavailable', 'Unable to determine your current location.');
     case err.TIMEOUT:
-      return 'Location request timed out. Please try again.';
+      return t('nav.gpsTimeout', 'Location request timed out. Please try again.');
     default:
-      return 'Unable to determine your current location.';
+      return t('nav.gpsUnknown', 'Unable to determine your current location.');
   }
 };
 
@@ -35,6 +36,7 @@ const haversine = (a, b) => {
 };
 
 export default function NavigationPanel({ job, open, onClose, onExpired }) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState('idle'); // idle | starting | active | error
   const [gpsError, setGpsError] = useState('');
   const [current, setCurrent] = useState(null); // { lat, lng }
@@ -120,7 +122,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
         return;
       }
       if (/assigned/i.test(msg)) {
-        toast.error('This job is not assigned to you.');
+        toast.error(t('nav.notAssigned', 'This job is not assigned to you.'));
         return;
       }
       toast.error(msg);
@@ -151,7 +153,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
     console.log('START NAVIGATION BUTTON CLICKED');
     if (!navigator.geolocation) {
       console.log('NAV: geolocation API unavailable');
-      setGpsError('Your browser does not support location services.');
+      setGpsError(t('nav.browserUnsupported', 'Your browser does not support location services.'));
       setPhase('error');
       return;
     }
@@ -172,7 +174,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
             console.log('NAV: GPS error', err && err.code, err && err.message);
             if (!mountedRef.current) return;
             clearWatch();
-            setGpsError(gpsErrorMessage(err));
+            setGpsError(gpsErrorMessage(err, t));
             setPhase('error');
           },
           GEO_OPTIONS
@@ -181,7 +183,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
       (err) => {
         console.log('NAV: GPS error', err && err.code, err && err.message);
         if (!mountedRef.current) return;
-        setGpsError(gpsErrorMessage(err));
+        setGpsError(gpsErrorMessage(err, t));
         setPhase('error');
       },
       GEO_OPTIONS
@@ -212,7 +214,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white">
           <div>
-            <p className="font-semibold text-gray-900">🧭 Navigation {phase === 'active' && <span className="text-green-600">Active</span>}</p>
+            <p className="font-semibold text-gray-900">🧭 {t('nav.navTitle', 'Navigation')} {phase === 'active' && <span className="text-green-600">{t('nav.active', 'Active')}</span>}</p>
             <p className="text-xs text-gray-500">{job.bookingNumber} · {job.serviceSnapshot?.name}</p>
           </div>
           <button onClick={() => { clearWatch(); onClose(); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-2">✕</button>
@@ -222,11 +224,11 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
           {/* Destination summary */}
           <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
             <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-400">Customer</p>
+              <p className="text-xs text-gray-400">{t('nav.customer', 'Customer')}</p>
               <p className="font-medium text-gray-900">{job.customer?.name || '—'}</p>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-400">Location</p>
+              <p className="text-xs text-gray-400">{t('nav.location', 'Location')}</p>
               <p className="font-medium text-gray-900">{job.address || '—'}</p>
             </div>
           </div>
@@ -237,24 +239,24 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
           )}
           {!canNavigate && (
             <div className="p-3 bg-yellow-50 text-yellow-700 text-sm rounded-xl">
-              This job is no longer active or has no destination coordinates.
+              {t('nav.inactiveWarning', 'This job is no longer active or has no destination coordinates.')}
             </div>
           )}
 
           {/* Actions */}
           {canNavigate && phase === 'idle' && (
-            <button onClick={startNavigation} className="btn-primary w-full py-3">📍 Start Navigation</button>
+            <button onClick={startNavigation} className="btn-primary w-full py-3">📍 {t('nav.startNavigation', 'Start Navigation')}</button>
           )}
           {canNavigate && phase === 'starting' && (
             <button disabled className="btn-primary w-full py-3 opacity-70 cursor-wait">
-              📍 Acquiring location…
+              📍 {t('nav.acquiringLocation', 'Acquiring location…')}
             </button>
           )}
           {canNavigate && phase === 'active' && (
-            <button onClick={stopNavigation} className="btn-secondary w-full py-3">🛑 Stop Navigation</button>
+            <button onClick={stopNavigation} className="btn-secondary w-full py-3">🛑 {t('nav.stopNavigation', 'Stop Navigation')}</button>
           )}
           {canNavigate && phase === 'error' && (
-            <button onClick={startNavigation} className="btn-primary w-full py-3">🔄 Retry Navigation</button>
+            <button onClick={startNavigation} className="btn-primary w-full py-3">🔄 {t('nav.retryNavigation', 'Retry Navigation')}</button>
           )}
 
           {destLatLng && (
@@ -264,7 +266,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
               rel="noopener noreferrer"
               className="block text-center text-sm text-brand-600 hover:underline"
             >
-              Open in Maps ↗
+              {t('nav.openInMaps', 'Open in Maps ↗')}
             </a>
           )}
 
@@ -284,18 +286,18 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
           {route && routeLoading && (
             <p className="text-xs text-gray-400 flex items-center gap-2">
               <span className="inline-block h-3 w-3 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></span>
-              Recalculating route…
+              {t('nav.recalculating', 'Recalculating route…')}
             </p>
           )}
           {route && !routeLoading && distanceKm !== null && (
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="p-3 bg-brand-50 rounded-xl">
                 <p className="text-lg font-bold text-gray-900">{distanceKm}<span className="text-xs font-normal"> km</span></p>
-                <p className="text-xs text-gray-500">Distance</p>
+                <p className="text-xs text-gray-500">{t('nav.distance', 'Distance')}</p>
               </div>
               <div className="p-3 bg-brand-50 rounded-xl">
                 <p className="text-lg font-bold text-gray-900">{etaMin}<span className="text-xs font-normal"> min</span></p>
-                <p className="text-xs text-gray-500">ETA</p>
+                <p className="text-xs text-gray-500">{t('nav.eta', 'ETA')}</p>
               </div>
               <div className="p-3 bg-brand-50 rounded-xl">
                 <p className="text-lg font-bold text-gray-900">{markers.length >= 2 ? '2' : '1'}<span className="text-xs font-normal"> pts</span></p>
@@ -306,7 +308,7 @@ export default function NavigationPanel({ job, open, onClose, onExpired }) {
           {!route && phase === 'active' && (
             <div className="flex items-center gap-2 text-sm text-gray-500 p-3 bg-gray-50 rounded-xl">
               <span className="inline-block h-3 w-3 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></span>
-              Calculating distance & ETA…
+              {t('nav.calculating', 'Calculating distance & ETA…')}
             </div>
           )}
         </div>

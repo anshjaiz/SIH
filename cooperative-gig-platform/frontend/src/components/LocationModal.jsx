@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import LocationPicker from './LocationPicker';
@@ -6,12 +7,16 @@ import LocationPicker from './LocationPicker';
 export default function LocationModal({
   onDone,
   endpoint = '/customers/profile',
-  title = '📍 Set your location',
-  description = "We'll use this as your default location so you get matched with nearby jobs only.",
+  title,
+  description,
   initial = {},
   dismissable = false,
-  dismissLabel = 'Skip for now',
+  dismissLabel,
 }) {
+  const { t } = useTranslation();
+  const resolvedTitle = title ?? t('loc.title', '📍 Set your location');
+  const resolvedDescription = description ?? t('loc.description', "We'll use this as your default location so you get matched with nearby jobs only.");
+  const resolvedDismissLabel = dismissLabel ?? t('loc.dismissLabel', 'Skip for now');
   const [value, setValue] = useState({
     address: initial.address || '',
     city: initial.city || '',
@@ -22,7 +27,7 @@ export default function LocationModal({
 
   const handleSave = async () => {
     if (!value.address || !value.city) {
-      toast.error('Please enter your address and city');
+      toast.error(t('toast.locMissing', 'Please enter your address and city'));
       return;
     }
     setSaving(true);
@@ -35,10 +40,10 @@ export default function LocationModal({
           coordinates: [parseFloat(value.lng) || 78.487, parseFloat(value.lat) || 17.385],
         },
       });
-      toast.success('Location saved.');
+      toast.success(t('toast.locSaved', 'Location saved.'));
       onDone();
     } catch (err) {
-      toast.error(err.message || 'Failed to save location');
+      toast.error(err.message || t('toast.locSaveFail', 'Failed to save location'));
     }
     setSaving(false);
   };
@@ -47,8 +52,8 @@ export default function LocationModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="p-6">
-          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-          <p className="text-sm text-gray-500 mt-1">{description}</p>
+          <h2 className="text-lg font-bold text-gray-900">{resolvedTitle}</h2>
+          <p className="text-sm text-gray-500 mt-1">{resolvedDescription}</p>
 
           <div className="mt-5">
             <LocationPicker value={value} onChange={setValue} />
@@ -57,11 +62,11 @@ export default function LocationModal({
           <div className="mt-6 flex gap-3">
             {dismissable && (
               <button onClick={onDone} type="button" className="btn-secondary flex-1">
-                {dismissLabel}
+                {resolvedDismissLabel}
               </button>
             )}
             <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-              {saving ? 'Saving...' : 'Save location'}
+              {saving ? t('loc.saving', 'Saving...') : t('loc.save', 'Save location')}
             </button>
           </div>
         </div>

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 
 const RESEND_COOLDOWN = 30;
@@ -11,8 +12,9 @@ const maskEmail = (email) => {
   return `${e[0]}${'*'.repeat(Math.max(2, Math.min(at - 1, 3)))}${e.slice(at)}`;
 };
 
-export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify your email' }) {
+export default function OtpVerify({ email, onVerified, onBack, heading }) {
   const { verifyOtp, resendOtp } = useAuth();
+  const { t } = useTranslation();
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -21,8 +23,8 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
   const sentInitialRef = useRef(false);
 
   const code = digits.join('');
+  const displayHeading = heading || t('auth.verificationCode');
 
-  // Auto-show a fresh code state once on mount (login-after-unverified flow).
   useEffect(() => {
     if (!sentInitialRef.current && email) {
       sentInitialRef.current = true;
@@ -31,8 +33,8 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
 
   useEffect(() => {
     if (cooldown <= 0) return undefined;
-    const t = setInterval(() => setCooldown((c) => c - 1), 1000);
-    return () => clearInterval(t);
+    const t2 = setInterval(() => setCooldown((c) => c - 1), 1000);
+    return () => clearInterval(t2);
   }, [cooldown]);
 
   const focusNext = (i) => inputsRef.current[i + 1]?.focus();
@@ -74,15 +76,15 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
     try {
       const res = await resendOtp(email);
       if (res.success) {
-        if (!silent) toast.success('A new verification code has been sent.');
+        if (!silent) toast.success(t('toast.verificationCodeSent'));
         setDigits(['', '', '', '', '', '']);
         inputsRef.current[0]?.focus();
       } else {
-        toast.error(res.message || 'Could not resend the code.');
+        toast.error(res.message || t('toast.codeResendFailed'));
       }
       setCooldown(RESEND_COOLDOWN);
     } catch {
-      toast.error('Could not resend the code.');
+      toast.error(t('toast.codeResendFailed'));
     }
     setResending(false);
   };
@@ -90,25 +92,24 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
   const handleVerify = async (e) => {
     e.preventDefault();
     if (code.length !== 6) {
-      toast.error('Please enter the 6-digit code');
+      toast.error(t('toast.enter6Digit'));
       return;
     }
     setLoading(true);
     try {
       const res = await verifyOtp(email, code);
       if (res.success) {
-        toast.success('Email verified successfully.');
+        toast.success(t('toast.emailVerified'));
         onVerified?.(res.data);
       } else {
-        toast.error(res.message || 'Verification failed');
-        // Expired or locked-out codes are useless — silently ask for a fresh one.
+        toast.error(res.message || t('toast.verificationFailed'));
         if (/expired|too many/i.test(res.message || '')) {
           setDigits(['', '', '', '', '', '']);
           handleResend(true);
         }
       }
     } catch (err) {
-      toast.error(err.message || 'Verification failed');
+      toast.error(err.message || t('toast.verificationFailed'));
     }
     setLoading(false);
   };
@@ -119,10 +120,10 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
         <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-100 rounded-xl mb-4">
           <span className="text-2xl">✉️</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">{heading}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{displayHeading}</h1>
         <p className="text-sm text-gray-500 mt-2">
-          We sent a 6-digit verification code to{' '}
-          <span className="font-medium text-gray-700">{maskEmail(email)}</span>. It expires in 5 minutes.
+          {t('auth.otpSentTo')}{' '}
+          <span className="font-medium text-gray-700">{maskEmail(email)}</span>. {t('auth.otpExpiresIn', { minutes: 5 })}
         </p>
       </div>
 
@@ -140,7 +141,7 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
               className={`w-11 h-14 text-center text-xl font-bold border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 ${
                 d ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-900'
               }`}
-              aria-label={`Digit ${i + 1}`}
+              aria-label={t('auth.digitLabel', { number: i + 1 })}
             />
           ))}
         </div>
@@ -149,30 +150,30 @@ export default function OtpVerify({ email, onVerified, onBack, heading = 'Verify
           {loading ? (
             <>
               <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
-              Verifying...
+              {t('auth.verifying')}
             </>
           ) : (
-            'Verify Email'
+            t('auth.verifyEmail')
           )}
         </button>
       </form>
 
       <div className="mt-5 text-center text-sm text-gray-600">
-        <span>Didn't receive it?</span>{' '}
+        <span>{t('auth.didntReceive')}</span>{' '}
         <button
           type="button"
           onClick={() => handleResend()}
           disabled={cooldown > 0 || resending}
           className="text-brand-600 font-medium hover:text-brand-800 disabled:text-gray-400"
         >
-          {resending ? 'Sending...' : cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+          {resending ? t('auth.sending') : cooldown > 0 ? t('auth.resendCodeIn', { seconds: cooldown }) : t('auth.resendCode')}
         </button>
       </div>
 
       {onBack && (
         <div className="mt-4 text-center text-sm text-gray-500">
           <button type="button" onClick={onBack} className="text-gray-500 hover:text-gray-700">
-            ← Back to sign up
+            ← {t('auth.backToRegister')}
           </button>
         </div>
       )}

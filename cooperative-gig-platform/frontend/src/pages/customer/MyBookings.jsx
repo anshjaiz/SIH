@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
 export default function MyBookings() {
+  const { t } = useTranslation();
   const [bookings, setBookings] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function MyBookings() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">My Bookings</h2>
+      <h2 className="text-xl font-bold text-gray-900">{t('book.title')}</h2>
 
       <div className="flex flex-wrap gap-2">
         {filters.map((f) => (
@@ -44,7 +46,7 @@ export default function MyBookings() {
               filter === f ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {f || 'All'}
+            {f ? t(`status.${f}`) : t('common.all')}
           </button>
         ))}
       </div>
@@ -52,7 +54,7 @@ export default function MyBookings() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div></div>
       ) : bookings.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">No bookings found</div>
+        <div className="text-center py-20 text-gray-400">{t('book.noBookings')}</div>
       ) : (
         <div className="space-y-4">
           {bookings.map((b) => (
@@ -74,11 +76,11 @@ export default function MyBookings() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className={`badge ${statusColors[b.status]}`}>{b.status}</span>
+                  <span className={`badge ${statusColors[b.status]}`}>{t(`status.${b.status}`)}</span>
                   <p className="text-sm font-semibold text-brand-600 mt-1">₹{b.priceBreakdown?.total}</p>
                 </div>
               </div>
-              {b.isEmergency && <p className="text-xs text-orange-600 font-medium mt-2">⚡ Emergency</p>}
+              {b.isEmergency && <p className="text-xs text-orange-600 font-medium mt-2">⚡ {t('book.emergency')}</p>}
             </Link>
           ))}
         </div>

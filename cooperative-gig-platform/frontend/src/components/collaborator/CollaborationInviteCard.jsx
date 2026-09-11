@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 const fmtDate = (d) => {
   if (!d) return '';
   const dt = new Date(d);
@@ -5,8 +7,9 @@ const fmtDate = (d) => {
 };
 
 export default function CollaborationInviteCard({ invite, onRespond, responding }) {
+  const { t } = useTranslation();
   const lead = invite.lead;
-  const leadName = invite.leadWorker?.user?.name || lead?.user?.name || 'Another worker';
+  const leadName = invite.leadWorker?.user?.name || lead?.user?.name || t('collab.anotherWorker', 'Another worker');
   const myScore = invite.myScore;
   const reasons = invite.myReasons || [];
   const alreadyAccepted = invite.myStatus === 'ACCEPTED';
@@ -19,14 +22,14 @@ export default function CollaborationInviteCard({ invite, onRespond, responding 
             {leadName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">🤝 Collaboration Opportunity</h3>
+            <h3 className="font-semibold text-gray-900">🤝 {t('collab.collabOpportunity', 'Collaboration Opportunity')}</h3>
             <p className="text-sm text-gray-500">
-              {leadName} needs a <span className="font-medium text-gray-700">{invite.role}</span>
+              {t('collab.needsRole', '{{name}} needs a {{role}}', { name: leadName, role: invite.role })}
             </p>
           </div>
         </div>
         {myScore != null && (
-          <span className="badge bg-green-100 text-green-700">Match {Math.round(myScore)}%</span>
+          <span className="badge bg-green-100 text-green-700">{t('collab.match', 'Match {{n}}%', { n: Math.round(myScore) })}</span>
         )}
       </div>
 
@@ -34,7 +37,7 @@ export default function CollaborationInviteCard({ invite, onRespond, responding 
         <div>📅 {fmtDate(invite.date)}</div>
         <div>⏰ {invite.startTime} · {invite.durationHours}h</div>
         <div className="col-span-2">📍 {invite.city || 'Hyderabad'} · {invite.address}</div>
-        <div className="col-span-2 font-medium text-brand-700">💰 Estimated earning ₹{invite.estimatedPayment}</div>
+        <div className="col-span-2 font-medium text-brand-700">💰 {t('collab.estimatedEarning', 'Estimated earning ₹{{amount}}', { amount: invite.estimatedPayment })}</div>
       </div>
 
       {invite.instructions && (
@@ -51,7 +54,7 @@ export default function CollaborationInviteCard({ invite, onRespond, responding 
 
       {alreadyAccepted ? (
         <div className="rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm font-medium p-3 text-center">
-          ✅ You've accepted this collaboration — view it under "My Team Jobs"
+          ✅ {t('collab.acceptedMsg', 'You\'ve accepted this collaboration — view it under "My Team Jobs"')}
         </div>
       ) : (
         <div className="flex gap-3">
@@ -60,14 +63,14 @@ export default function CollaborationInviteCard({ invite, onRespond, responding 
             disabled={responding}
             className="btn-success flex-1"
           >
-            ✓ Accept
+            ✓ {t('collab.accept', 'Accept')}
           </button>
           <button
             onClick={() => onRespond(invite._id, 'DECLINE')}
             disabled={responding}
             className="btn-secondary flex-1"
           >
-            Decline
+            {t('collab.decline', 'Decline')}
           </button>
         </div>
       )}

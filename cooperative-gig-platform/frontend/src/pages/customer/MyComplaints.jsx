@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 import EvidenceList from '../../components/EvidenceList';
 import { statusColors, priorityColors, label, COMPLAINT_CATEGORIES, PREFERRED_RESOLUTIONS, refundStatusColors } from '../../utils/complaints';
 
 export default function MyComplaints() {
+  const { t } = useTranslation();
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -20,27 +22,27 @@ export default function MyComplaints() {
   useEffect(() => { load(); }, []);
 
   const handleCancel = async (id) => {
-    if (!window.confirm('Cancel this complaint?')) return;
+    if (!window.confirm(t('compl.cancelConfirm', 'Cancel this complaint?'))) return;
     try {
       await api.post(`/complaints/${id}/cancel`);
-      toast.success('Complaint cancelled');
+      toast.success(t('toast.complaintCancelled', 'Complaint cancelled'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.failed', 'Failed'));
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">My Complaints</h2>
-        <p className="text-sm text-gray-500">Track the status of complaints raised against your bookings</p>
+        <h2 className="text-xl font-bold text-gray-900">{t('compl.myComplaints', 'My Complaints')}</h2>
+        <p className="text-sm text-gray-500">{t('compl.trackHint', 'Track the status of complaints raised against your bookings')}</p>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div></div>
       ) : complaints.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">You haven't raised any complaints yet</div>
+        <div className="text-center py-20 text-gray-400">{t('compl.empty', 'You haven\'t raised any complaints yet')}</div>
       ) : (
         <div className="space-y-4">
           {complaints.map((c) => (
@@ -53,22 +55,22 @@ export default function MyComplaints() {
                     <span className={`badge ${priorityColors[c.priority] || 'badge-gray'}`}>{c.priority}</span>
                     <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-gray-700 mb-1"><span className="text-gray-400">Category:</span> {label(c.category, COMPLAINT_CATEGORIES)}</p>
+                  <p className="text-sm text-gray-700 mb-1"><span className="text-gray-400">{t('compl.category', 'Category:')}</span> {label(c.category, COMPLAINT_CATEGORIES)}</p>
                   <p className="text-sm text-gray-600">{c.description}</p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Booking: {c.booking?.bookingNumber || '—'} • {c.booking?.serviceSnapshot?.name || ''}
+                    {t('compl.booking', 'Booking: {{num}}', { num: c.booking?.bookingNumber || '—' })} • {c.booking?.serviceSnapshot?.name || ''}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Requested: {label(c.preferredResolution, PREFERRED_RESOLUTIONS)}
+                    {t('compl.requested', 'Requested: {{res}}', { res: label(c.preferredResolution, PREFERRED_RESOLUTIONS) })}
                   </p>
-                  {c.isSafety && <p className="text-xs text-red-600 font-medium mt-1">⚠ Marked urgent (safety)</p>}
+                  {c.isSafety && <p className="text-xs text-red-600 font-medium mt-1">{t('compl.safety', '⚠ Marked urgent (safety)')}</p>}
                 </div>
                 <div className="flex flex-col gap-2 items-end shrink-0">
                   <button onClick={() => setSelected(selected && selected._id === c._id ? null : c)} className="text-xs text-brand-600 font-medium">
-                    {selected && selected._id === c._id ? 'Hide details' : 'Details'}
+                    {selected && selected._id === c._id ? t('compl.hideDetails', 'Hide details') : t('compl.details', 'Details')}
                   </button>
                   {['SUBMITTED', 'UNDER_REVIEW'].includes(c.status) && (
-                    <button onClick={() => handleCancel(c._id)} className="text-xs text-red-600 font-medium">Cancel complaint</button>
+                    <button onClick={() => handleCancel(c._id)} className="text-xs text-red-600 font-medium">{t('compl.cancelComplaint', 'Cancel complaint')}</button>
                   )}
                 </div>
               </div>
@@ -89,20 +91,20 @@ export default function MyComplaints() {
 
                   {c.evidence?.length > 0 && (
                     <div>
-                      <p className="text-xs text-gray-500 font-medium mb-1">My evidence</p>
+                      <p className="text-xs text-gray-500 font-medium mb-1">{t('compl.myEvidence', 'My evidence')}</p>
                       <EvidenceList items={c.evidence} max={6} />
                     </div>
                   )}
 
                   {c.responses?.length > 0 && (
                     <div>
-                      <p className="text-xs text-gray-500 font-medium mb-1">Conversation</p>
+                      <p className="text-xs text-gray-500 font-medium mb-1">{t('compl.conversation', 'Conversation')}</p>
                       <div className="space-y-2">
                         {c.responses.map((r, i) => (
                           <div key={i} className="text-xs bg-gray-50 p-2 rounded-lg">
                             <span className="font-semibold text-gray-700">{r.role} · {new Date(r.submittedAt).toLocaleString()}</span>
-                            {r.acceptResponsibility && <span className="ml-2 text-amber-600">accepts responsibility</span>}
-                            {r.dispute && <span className="ml-2 text-red-600">disputes</span>}
+                            {r.acceptResponsibility && <span className="ml-2 text-amber-600">{t('compl.acceptsResponsibility', 'accepts responsibility')}</span>}
+                            {r.dispute && <span className="ml-2 text-red-600">{t('compl.disputes', 'disputes')}</span>}
                             {r.message && <p className="text-gray-600 mt-0.5">{r.message}</p>}
                             {r.evidence?.length > 0 && <div className="mt-1"><EvidenceList items={r.evidence} max={3} /></div>}
                           </div>
@@ -113,15 +115,15 @@ export default function MyComplaints() {
 
                   {c.resolutionDecision && (
                     <div className="text-xs bg-green-50 p-2 rounded-lg">
-                      <span className="font-semibold text-green-700">Resolution: {c.resolutionDecision.decisionType?.replace('_', ' ')}</span>
+                      <span className="font-semibold text-green-700">{t('compl.resolution', 'Resolution: {{type}}', { type: c.resolutionDecision.decisionType?.replace('_', ' ') })}</span>
                       {c.resolutionDecision.reason && <p className="text-green-700">{c.resolutionDecision.reason}</p>}
-                      {c.resolutionDecision.amount > 0 && <p className="text-green-700 mt-1">Amount: ₹{c.resolutionDecision.amount}</p>}
+                      {c.resolutionDecision.amount > 0 && <p className="text-green-700 mt-1">{t('compl.amount', 'Amount: ₹{{amt}}', { amt: c.resolutionDecision.amount })}</p>}
                     </div>
                   )}
 
                   {c.refund?.status && c.refund.status !== 'NOT_REQUIRED' && (
                     <div className="text-xs bg-blue-50 p-2 rounded-lg flex items-center gap-2">
-                      <span className="font-semibold text-blue-700">Refund {c.refund.refundNumber}</span>
+                      <span className="font-semibold text-blue-700">{t('compl.refund', 'Refund {{ref}}', { ref: c.refund.refundNumber })}</span>
                       <span className={`badge ${refundStatusColors[c.refund.status]}`}>{c.refund.status}</span>
                       <span>₹{c.refund.amount}</span>
                     </div>

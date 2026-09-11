@@ -10,7 +10,7 @@ const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const { chat } = require('../../services/ai/workerAssistantService');
 
 const chatHandler = asyncHandler(async (req, res) => {
-  const { message, conversationHistory } = req.body;
+  const { message, conversationHistory, language } = req.body;
   if (!message || !String(message).trim()) {
     throw new ApiError('Message is required', 400);
   }
@@ -23,7 +23,8 @@ const chatHandler = asyncHandler(async (req, res) => {
     ? conversationHistory.slice(-24)
     : [];
 
-  const response = await chat(worker._id, String(message).trim(), history);
+  const lang = String(language || 'en').toLowerCase();
+  const response = await chat(worker._id, String(message).trim(), history, lang);
 
   res.json({
     success: true,

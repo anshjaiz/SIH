@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 const MEMBER_STATUS_COLORS = {
   INVITED: 'bg-blue-100 text-blue-700',
   ACCEPTED: 'bg-green-100 text-green-700',
@@ -29,6 +31,7 @@ const fmtAgo = (d) => {
 };
 
 export default function JobTeamCard({ team, helperLocs = {}, bookingLocation }) {
+  const { t } = useTranslation();
   if (!team) return null;
 
   const accepted = team.members.filter((m) => m.status === 'ACCEPTED' || m.status === 'COMPLETED');
@@ -38,23 +41,23 @@ export default function JobTeamCard({ team, helperLocs = {}, bookingLocation }) 
     <div className="p-4 bg-brand-50 rounded-xl">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h4 className="font-semibold text-gray-900 text-sm">👥 Job Team</h4>
+          <h4 className="font-semibold text-gray-900 text-sm">👥 {t('collab.jobTeam', 'Job Team')}</h4>
           <p className="text-xs text-gray-500">
-            {team.lead?.user?.name || 'You'} (lead) · {filled}/{team.members.length} filled
+            {team.lead?.user?.name || 'You'} ({t('collab.leadLabel', 'lead')}) · {t('collab.filledOf', '{{filled}}/{{total}} filled', { filled, total: team.members.length })}
           </p>
         </div>
         <span className={`badge px-2 py-0.5 ${team.completed ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'}`}>
-          {team.completed ? 'Completed' : 'Active'}
+          {team.completed ? t('collab.completed', 'Completed') : t('collab.active', 'Active')}
         </span>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
           <div className="text-sm">
-            <span className="font-medium text-gray-800">⭐ {team.lead?.user?.name || 'Lead'}</span>
-            <span className="badge bg-brand-100 text-brand-700 ml-2">Lead</span>
+            <span className="font-medium text-gray-800">⭐ {team.lead?.user?.name || t('collab.leadFallback', 'Lead')}</span>
+            <span className="badge bg-brand-100 text-brand-700 ml-2">{t('collab.leadBadge', 'Lead')}</span>
           </div>
-          <span className="text-xs text-gray-400">Rating {team.lead?.rating || '—'}</span>
+          <span className="text-xs text-gray-400">{t('collab.ratingLabel', 'Rating {{rating}}', { rating: team.lead?.rating || '—' })}</span>
         </div>
         {team.members.map((m, i) => {
           const loc = helperLocs[m.worker] || m.location?.coordinates;
@@ -64,7 +67,7 @@ export default function JobTeamCard({ team, helperLocs = {}, bookingLocation }) 
           return (
             <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
               <div className="text-sm">
-                <span className="font-medium text-gray-800">{m.workerProfile?.user?.name || 'Worker'}</span>
+                <span className="font-medium text-gray-800">{m.workerProfile?.user?.name || t('collab.workerFallback', 'Worker')}</span>
                 <span className="text-gray-400"> · {m.role}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -82,7 +85,7 @@ export default function JobTeamCard({ team, helperLocs = {}, bookingLocation }) 
       </div>
 
       {helperLocs && Object.keys(helperLocs).length > 0 && (
-        <p className="text-[11px] text-gray-400 mt-2">🟢 Live location updates arrive every 10s from collaborating helpers.</p>
+        <p className="text-[11px] text-gray-400 mt-2">🟢 {t('collab.liveLocationNote', 'Live location updates arrive every 10s from collaborating helpers.')}</p>
       )}
     </div>
   );

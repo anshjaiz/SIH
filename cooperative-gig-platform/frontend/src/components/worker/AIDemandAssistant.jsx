@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import MapComponent from '../MapComponent';
 import toast from 'react-hot-toast';
 
 const LEVEL_META = {
-  VERY_HIGH: { label: 'VERY HIGH', emoji: '🔴', color: '#dc2626', badge: 'badge-danger' },
-  HIGH: { label: 'HIGH', emoji: '🟠', color: '#f97316', badge: 'badge-warning' },
-  MEDIUM: { label: 'MEDIUM', emoji: '🟡', color: '#eab308', badge: 'badge-warning' },
-  LOW: { label: 'LOW', emoji: '🟢', color: '#22c55e', badge: 'badge-success' },
+  VERY_HIGH: { labelKey: 'demand.levelVeryHigh', emoji: '🔴', color: '#dc2626', badge: 'badge-danger' },
+  HIGH: { labelKey: 'demand.levelHigh', emoji: '🟠', color: '#f97316', badge: 'badge-warning' },
+  MEDIUM: { labelKey: 'demand.levelMedium', emoji: '🟡', color: '#eab308', badge: 'badge-warning' },
+  LOW: { labelKey: 'demand.levelLow', emoji: '🟢', color: '#22c55e', badge: 'badge-success' },
 };
 
 export default function AIDemandAssistant() {
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [navRoute, setNavRoute] = useState(null);
@@ -41,7 +43,7 @@ export default function AIDemandAssistant() {
       }
     } catch (e) {
       console.error(e);
-      toast.error(e.message || 'Could not load demand data');
+      toast.error(e.message || t('demand.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -82,20 +84,21 @@ export default function AIDemandAssistant() {
     return out;
   }, [zones, workerLoc]);
 
-  const markers = useMemo(() => {
+const markers = useMemo(() => {
     const out = [];
-    if (workerLoc) out.push({ lat: workerLoc.lat, lng: workerLoc.lng, type: 'worker', label: 'You', details: `Working radius ${workerLoc.radiusKm} km` });
+    if (workerLoc) out.push({ lat: workerLoc.lat, lng: workerLoc.lng, type: 'worker', label: t('demand.you'), details: t('demand.workingRadius', { km: workerLoc.radiusKm }) });
     if (recommendation && !navRoute) {
       out.push({
         lat: recommendation.navigateTo.lat,
         lng: recommendation.navigateTo.lng,
         type: 'customer',
-        label: `Recommended: ${zones?.find((z) => z.key === recommendation.zoneKey)?.topArea || 'nearby area'}`,
-        details: `${recommendation.demandLevel} demand • ${recommendation.distanceKm} km away`,
+        label: t('demand.recommendedLabel', { area: zones?.find((z) => z.key === recommendation.zoneKey)?.topArea || t('demand.nearbyArea') }),
+        details: t('demand.markerDemand', { level: t(LEVEL_META[recommendation.demandLevel]?.labelKey || 'demand.levelLow'), km: recommendation.distanceKm }),
       });
     }
     return out;
-  }, [workerLoc, recommendation, navRoute, zones]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workerLoc, recommendation, navRoute, zones, i18n.language]);
 
   const polylines = useMemo(
     () =>
@@ -126,7 +129,7 @@ export default function AIDemandAssistant() {
       });
       setMapKey((k) => k + 1);
     } catch (e) {
-      toast.error(e.message || 'No route found');
+      toast.error(e.message || t('demand.noRoute'));
     } finally {
       setNavLoading(false);
     }
@@ -150,15 +153,15 @@ export default function AIDemandAssistant() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-xl">🤖</span>
-          <h3 className="font-semibold">AI Demand Assistant</h3>
-          <span className="badge badge-info">LIVE DEMAND</span>
+          <h3 className="font-semibold">{t('demand.title')}</h3>
+          <span className="badge badge-info">{t('demand.liveBadge')}</span>
         </div>
         <button
           onClick={load}
           disabled={loading}
           className="text-xs text-brand-600 hover:underline disabled:opacity-50"
         >
-          {loading ? 'Loading…' : '⟳ Refresh'}
+          {loading ? t('demand.loading') : '⟳ ' + t('demand.refresh')}
         </button>
       </div>
 
@@ -171,10 +174,10 @@ export default function AIDemandAssistant() {
       {!loading && (!zones || zones.length === 0) && (
         <div className="card bg-yellow-50 border border-yellow-200 py-8 text-center">
           <p className="text-yellow-700 font-medium">
-            No recent job demand near you yet.
+            {t('demand.noDemand')}
           </p>
           <p className="text-sm text-yellow-600 mt-1">
-            We compute demand from real requests in the last {data?.windowDays || 14} days. Check back soon!
+            {t('demand.noDemandHint', { days: data?.windowDays || 14 })}
           </p>
         </div>
       )}
@@ -190,28 +193,28 @@ export default function AIDemandAssistant() {
               {!recIsHere && (
                 <>
                   <div className="mt-3 p-3 rounded-lg bg-white border border-gray-200">
-                    <p className="font-medium text-sm">High demand detected:</p>
+                    <p className="font-medium text-sm">{t('demand.highDemandDetected')}</p>
                     <p className="text-sm mt-1">
                       📍 <span className="font-medium">{recommendation.navigateTo.lat.toFixed(4)}, {recommendation.navigateTo.lng.toFixed(4)}</span>
                     </p>
-                    <p className="text-sm">🐾 {recommendation.distanceKm} km away</p>
+                    <p className="text-sm">🐾 {t('demand.kmAway', { km: recommendation.distanceKm })}</p>
                     <p className="text-sm">
-                      📈 Demand: <span className={`badge ${LEVEL_META[recommendation.demandLevel]?.badge || 'badge-gray'}`}>
-                        {LEVEL_META[recommendation.demandLevel]?.label || recommendation.demandLevel}
+                      📈 {t('demand.demandLabel')}: <span className={`badge ${LEVEL_META[recommendation.demandLevel]?.badge || 'badge-gray'}`}>
+                        {t(LEVEL_META[recommendation.demandLevel]?.labelKey || 'demand.levelLow')}
                       </span>
                     </p>
                     <p className="text-sm mt-1 text-gray-500">
-                      Moving toward this area may increase your chances of receiving a job.
+                      {t('demand.moveHint')}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 mt-3">
                     <button onClick={navigateThere} disabled={navLoading} className="btn-primary text-sm">
-                      {navLoading ? 'Finding route…' : navRoute ? '⟳ Route loaded' : '🧭 Navigate There'}
+                      {navLoading ? t('demand.findingRoute') : navRoute ? '⟳ ' + t('demand.routeLoaded') : '🧭 ' + t('demand.navigateThere')}
                     </button>
                     {navRoute && (
                       <>
                         <span className="text-xs text-gray-500">
-                          🚗 {(navRoute.distance / 1000).toFixed(1)} km • ⏱ {Math.round(navRoute.duration / 60)} min
+                          🚗 {t('demand.routeSummary', { km: (navRoute.distance / 1000).toFixed(1), min: Math.round(navRoute.duration / 60) })}
                         </span>
                         <a
                           className="text-xs text-brand-600 hover:underline"
@@ -219,7 +222,7 @@ export default function AIDemandAssistant() {
                           rel="noreferrer"
                           href={`https://www.google.com/maps/dir/?api=1&origin=${workerLoc.lat},${workerLoc.lng}&destination=${recommendation.navigateTo.lat},${recommendation.navigateTo.lng}`}
                         >
-                          Open in Maps →
+                          {t('demand.openInMaps')} →
                         </a>
                       </>
                     )}
@@ -231,15 +234,13 @@ export default function AIDemandAssistant() {
             <div className="rounded-lg p-4 bg-gray-50 border border-gray-200">
               <p className="font-semibold text-gray-900">
                 {currentZone
-                  ? `Demand in your current area: ${LEVEL_META[currentZone.level]?.label || currentZone.level}`
-                  : 'No clearly better area nearby right now.'}
+                  ? t('demand.currentArea', { level: t(LEVEL_META[currentZone.level]?.labelKey || 'demand.levelLow') })
+                  : t('demand.noBetterArea')}
               </p>
               <p className="text-sm text-gray-600 mt-1">
                 {currentZone
-                  ? `Stay put for now — the highest-demand nearby area is only ${Math.round(
-                      (zones[0]?.distanceKm || 0)
-                    )} km away.`
-                  : 'When new requests come in we will show you where demand is rising.'}
+                  ? t('demand.stayPut', { km: Math.round(zones[0]?.distanceKm || 0) })
+                  : t('demand.risingDemandHint')}
               </p>
             </div>
           )}
@@ -261,7 +262,7 @@ export default function AIDemandAssistant() {
           {/* Hot zones */}
           {(zones || []).length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Demand by area</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('demand.demandByArea')}</p>
               <div className="space-y-2">
                 {zones.slice(0, 4).map((z) => {
                   const meta = LEVEL_META[z.level] || LEVEL_META.LOW;
@@ -274,15 +275,15 @@ export default function AIDemandAssistant() {
                       <div>
                         <p className="text-sm font-medium text-gray-900">
                           {meta.emoji} {z.topArea || `~${z.lat.toFixed(2)}, ${z.lng.toFixed(2)}`}
-                          {z.insideRadius && <span className="text-xs text-gray-400 ml-1">(in radius)</span>}
+                          {z.insideRadius && <span className="text-xs text-gray-400 ml-1">({t('demand.inRadius')})</span>}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {z.recentRequests} recent • {z.activeJobs} open • {z.completedJobs} completed • score {z.score}
+                          {t('demand.zoneStats', { recent: z.recentRequests, open: z.activeJobs, completed: z.completedJobs, score: z.score })}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`badge ${meta.badge}`}>{meta.label}</span>
-                        <span className="text-xs text-gray-400">{z.distanceKm} km</span>
+                        <span className={`badge ${meta.badge}`}>{t(meta.labelKey)}</span>
+                        <span className="text-xs text-gray-400">{t('demand.kmAway', { km: z.distanceKm })}</span>
                       </div>
                     </button>
                   );
@@ -294,16 +295,16 @@ export default function AIDemandAssistant() {
           {/* Legend + honest disclaimer */}
           <div className="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-3">
             <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#dc2626' }} />Very High</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#f97316' }} />High</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#eab308' }} />Medium</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e' }} />Low</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#dc2626' }} />{t('demand.levelVeryHigh')}</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#f97316' }} />{t('demand.levelHigh')}</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#eab308' }} />{t('demand.levelMedium')}</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e' }} />{t('demand.levelLow')}</span>
             </div>
             <p className="text-xs text-gray-400 ml-auto">
-              CURRENT DEMAND from real requests (last {data?.windowDays || 14} days) {workerLoc ? `within ${data?.searchRadiusKm || 30} km of you` : ''}.{' '}
+              {t('demand.footer', { days: data?.windowDays || 14 })}{workerLoc ? ` ${t('demand.withinKm', { km: data?.searchRadiusKm || 30 })}` : ''}.{' '}
               {prediction?.available
-                ? 'Short-term trend available.'
-                : 'Not an AI prediction — yet.'}
+                ? t('demand.trendAvailable')
+                : t('demand.notPrediction')}
             </p>
           </div>
         </div>

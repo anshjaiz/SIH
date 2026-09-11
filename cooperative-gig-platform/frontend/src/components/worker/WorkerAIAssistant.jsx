@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const QUICK_PROMPTS = [
-  { label: '📍 Demand', q: 'Where is demand high near me today?' },
-  { label: '💰 Earnings', q: 'How can I increase my earnings?' },
-  { label: '🎯 Skills', q: 'Which skill should I learn to get more jobs?' },
-  { label: '📊 Performance', q: 'How am I performing this month?' },
-  { label: '🧭 Find Jobs', q: 'What jobs are available near me?' },
-  { label: '📚 Learn', q: 'Teach me the basics of plumbing.' },
+  { labelKey: 'bot.quickPrompts.demand.label', qKey: 'bot.quickPrompts.demand.q' },
+  { labelKey: 'bot.quickPrompts.earnings.label', qKey: 'bot.quickPrompts.earnings.q' },
+  { labelKey: 'bot.quickPrompts.skills.label', qKey: 'bot.quickPrompts.skills.q' },
+  { labelKey: 'bot.quickPrompts.performance.label', qKey: 'bot.quickPrompts.performance.q' },
+  { labelKey: 'bot.quickPrompts.findJobs.label', qKey: 'bot.quickPrompts.findJobs.q' },
+  { labelKey: 'bot.quickPrompts.learn.label', qKey: 'bot.quickPrompts.learn.q' },
 ];
 
 // Safe inline Markdown renderer: **bold**, *italic*, bullet lists, numbered lists, headers.
@@ -92,10 +93,11 @@ function renderReply(text) {
 }
 
 export default function WorkerAIAssistant() {
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState(() => [
     {
       role: 'assistant',
-      text: "Hello! I'm your **ShramikSetu AI Assistant** — powered by AI and connected to your real platform data.\n\nI can help with jobs, earnings, skills, demand, or any general question. Ask me anything — in English, Hindi, or Hinglish.",
+      text: t('bot.welcome'),
     },
   ]);
   const [input, setInput] = useState('');
@@ -127,26 +129,27 @@ export default function WorkerAIAssistant() {
       const res = await api.post('/workers/ai-assistant/chat', {
         message: q,
         conversationHistory: history,
+        language: i18n.language || 'en',
       });
       const { reply, dataUsed, actions } = res.data || {};
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: reply || 'I could not generate a response.',
+          text: reply || t('bot.couldNotAnswer'),
           dataUsed,
           actions: actions || [],
         },
       ]);
     } catch (e) {
       console.error(e);
-      const errMsg = e.response?.data?.message || e.message || 'The assistant could not answer.';
+      const errMsg = e.response?.data?.message || e.message || t('bot.couldNotAnswer');
       toast.error(errMsg);
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: "Sorry, I couldn't process that right now. Please try again in a moment.",
+          text: t('bot.errorReply'),
         },
       ]);
     } finally {
@@ -159,7 +162,7 @@ export default function WorkerAIAssistant() {
     setMessages([
       {
         role: 'assistant',
-        text: "Chat cleared. I'm ready to help! Ask me anything about jobs, skills, earnings, or any general question.",
+        text: t('bot.cleared'),
       },
     ]);
     setShowQuick(true);
@@ -179,10 +182,10 @@ export default function WorkerAIAssistant() {
         <div className="flex items-center gap-2">
           <span className="text-xl">🤖</span>
           <div>
-            <h3 className="font-semibold text-gray-900 leading-tight">ShramikSetu AI</h3>
-            <p className="text-xs text-gray-500">Your intelligent assistant for jobs, earnings &amp; skill growth</p>
+            <h3 className="font-semibold text-gray-900 leading-tight">{t('bot.title')}</h3>
+            <p className="text-xs text-gray-500">{t('bot.subtitle')}</p>
           </div>
-          <span className="badge badge-info">GEMINI AI</span>
+          <span className="badge badge-info">{t('bot.badge')}</span>
         </div>
         {messages.length > 1 && (
           <button
@@ -213,7 +216,7 @@ export default function WorkerAIAssistant() {
                 <div className="mt-2 pt-1.5 border-t border-gray-100 space-y-1.5">
                   {m.dataUsed?.length > 0 && (
                     <span className="text-[10px] text-gray-400">
-                      Used platform data: {m.dataUsed.join(', ')}
+                      {t('bot.usedData', { list: m.dataUsed.join(', ') })}
                     </span>
                   )}
                   {m.actions?.map((a, ai) => (
@@ -223,7 +226,7 @@ export default function WorkerAIAssistant() {
                       className="flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-100 rounded-full px-2.5 py-1 transition-colors"
                     >
                       <span>🗺️</span>
-                      {a.label || 'View on Heatmap'}
+                      {a.label || t('bot.viewHeatmap')}
                     </button>
                   ))}
                 </div>
@@ -239,7 +242,7 @@ export default function WorkerAIAssistant() {
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-xs text-gray-400">Thinking…</span>
+              <span className="text-xs text-gray-400">{t('bot.thinking')}</span>
             </div>
           </div>
         )}
@@ -250,12 +253,12 @@ export default function WorkerAIAssistant() {
         <div className="flex gap-2 flex-wrap mt-3">
           {QUICK_PROMPTS.map((p) => (
             <button
-              key={p.label}
-              onClick={() => send(p.q)}
+              key={p.labelKey}
+              onClick={() => send(t(p.qKey))}
               disabled={loading}
               className="text-xs px-2.5 py-1.5 rounded-full bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-100 disabled:opacity-50 transition-colors"
             >
-              {p.label}
+              {t(p.labelKey)}
             </button>
           ))}
         </div>
@@ -273,18 +276,17 @@ export default function WorkerAIAssistant() {
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask me anything…"
+          placeholder={t('bot.placeholder')}
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           disabled={loading}
         />
         <button type="submit" disabled={loading || !input.trim()} className="btn-primary !py-2 text-sm">
-          Send
+          {t('bot.send')}
         </button>
       </form>
 
       <p className="text-[11px] text-gray-400 mt-2">
-        Powered by Gemini AI. Uses your real ShramikSetu data when relevant.
-        For general questions, answers come from AI knowledge. Data is never shared externally.
+        {t('bot.footer')}
       </p>
     </div>
   );

@@ -4,6 +4,7 @@ import api from '../../services/api';
 import MapComponent from '../../components/MapComponent';
 import ChatPanel from '../../components/ChatPanel';
 import { getSocket } from '../../services/socket';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { COMPLAINT_CATEGORIES, PREFERRED_RESOLUTIONS } from '../../utils/complaints';
 
@@ -20,7 +21,6 @@ const loadRazorpayScript = (src = 'https://checkout.razorpay.com/v1/checkout.js'
     document.body.appendChild(s);
   });
 
-// A valid [lng, lat] pair — empty arrays (worker hasn't shared a location) are NOT a location.
 const isValidCoords = (c) =>
   Array.isArray(c) &&
   c.length === 2 &&
@@ -43,6 +43,7 @@ const haversineKm = (coords, coords2) => {
 
 export default function BookingDetails() {
   const { id } = useParams();
+  const { t, i18n } = useTranslation();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [workerLocation, setWorkerLocation] = useState(null);
@@ -72,14 +73,13 @@ export default function BookingDetails() {
         setSyncedAt(new Date());
       }
     } catch (e) {
-      toast.error('Booking not found');
+      toast.error(t('book.noDetails'));
     }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [id]);
 
-  // Live tracking: poll for the worker's last-known location + listen to socket updates
   const trackingActive = !!booking && booking.worker && TRACKING_STATUSES.includes(booking.status);
   useEffect(() => {
     if (!trackingActive) return;
@@ -93,8 +93,8 @@ export default function BookingDetails() {
         }
       } catch { /* ignore */ }
     };
-    const t = setInterval(poll, 15000);
-    return () => clearInterval(t);
+    const t2 = setInterval(poll, 15000);
+    return () => clearInterval(t2);
   }, [trackingActive, id]);
 
   useEffect(() => {
@@ -123,42 +123,38 @@ export default function BookingDetails() {
   const handleConfirm = async () => {
     try {
       await api.post(`/customers/bookings/${id}/confirm`);
-      toast.success('Job confirmed!');
+      toast.success(t('active.completeConfirm'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('book.noDetails'));
     }
   };
 
   const handlePay = async () => {
     try {
       setPaying(true);
-      // 1) Create the order — the backend recomputes the amount from the
-      //    booking's price breakdown and returns the gateway + order id.
       const res = await api.post('/payments/create-order', { bookingId: id });
       if (!res.success) throw new Error(res.message || 'Could not create the payment order');
       const { gateway, key, order, paymentId } = res.data;
 
       if (gateway === 'mock') {
-        // MOCK gateway — instant success, still verified on the backend.
         const ver = await api.post('/payments/verify', {
           razorpay_order_id: order.id,
           razorpay_payment_id: `mock_${paymentId}_${Date.now()}`,
           razorpay_signature: 'mock',
         });
-        toast.success(ver.message || 'Payment successful!');
+        toast.success(ver.message || t('earn.completed'));
         load();
         return;
       }
 
-      // 2) Razorpay checkout (real TEST mode when keys are configured).
       await loadRazorpayScript();
       const options = {
         key,
-        amount: order.amount, // paise
+        amount: order.amount,
         currency: order.currency,
         name: 'ShramikSetu Cooperative',
-        description: 'Service payment',
+        description: t('book.bookingNumber', { number: booking.bookingNumber }),
         order_id: order.id,
         handler: async (response) => {
           try {
@@ -167,10 +163,10 @@ export default function BookingDetails() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            toast.success(ver.message || 'Payment successful!');
+            toast.success(ver.message || t('book.payNow'));
             load();
           } catch (e) {
-            toast.error(e.message || 'Payment verification failed');
+            toast.error(e.message || t('book.noDetails'));
           }
         },
         theme: { color: '#0f766e' },
@@ -178,24 +174,24 @@ export default function BookingDetails() {
       };
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', (r) => {
-        toast.error(r?.error?.description || 'Payment failed. Your booking was not charged.');
+        toast.error(r?.error?.description || t('book.noDetails'));
       });
       rzp.open();
     } catch (err) {
-      toast.error(err.message || 'Payment failed');
+      toast.error(err.message || t('book.noDetails'));
     } finally {
       setPaying(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!window.confirm('Are you sure you want to cancel?')) return;
+    if (!window.confirm(t('book.cancelConfirm'))) return;
     try {
       await api.put(`/customers/bookings/${id}/cancel`, { reason: 'Cancelled by customer' });
-      toast.success('Booking cancelled');
+      toast.success(t('toast.cancelSuccess'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
@@ -203,33 +199,33 @@ export default function BookingDetails() {
     try {
       const res = await api.post(`/customers/bookings/${id}/reassign`);
       if (res.success) {
-        toast.success('Looking for a replacement worker…');
+        toast.success(t('book.reassignLooking'));
       } else {
-        toast.error(res.message || 'No replacement worker available right now');
+        toast.error(res.message || t('book.noReplacement'));
       }
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
   const handleApproveMaterial = async (requestId) => {
     try {
       await api.post(`/customers/bookings/${id}/material-request/${requestId}/approve`);
-      toast.success('Material cost approved');
+      toast.success(t('book.materialApproved'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
   const handleRejectMaterial = async (requestId) => {
     try {
       await api.post(`/customers/bookings/${id}/material-request/${requestId}/reject`);
-      toast.success('Material cost rejected — original service charge kept');
+      toast.success(t('book.materialRejected'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
@@ -244,17 +240,17 @@ export default function BookingDetails() {
         pricing: quality,
         comment: 'Great service!',
       });
-      toast.success('Review submitted!');
+      toast.success(t('book.reviewSubmitted'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
   const submitComplaint = async (e) => {
     e.preventDefault();
     if (!complaintForm.category || !complaintForm.description.trim()) {
-      toast.error('Category and description are required');
+      toast.error(t('compl.requiredCategoryDesc'));
       return;
     }
     try {
@@ -266,13 +262,13 @@ export default function BookingDetails() {
       fd.append('preferredResolution', complaintForm.preferredResolution);
       complaintFiles.forEach((f, i) => fd.append('evidence', f));
       await api.post('/complaints', fd);
-      toast.success('Complaint filed! Our team will review it.');
+      toast.success(t('compl.complaintFiled'));
       setShowComplaint(false);
       setComplaintForm({ category: '', description: '', preferredResolution: 'FULL_REFUND' });
       setComplaintFiles([]);
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed to file complaint');
+      toast.error(err.message || t('compl.complaintFailed'));
     } finally {
       setFilingComplaint(false);
     }
@@ -283,7 +279,7 @@ export default function BookingDetails() {
   }
 
   if (!booking) {
-    return <div className="text-center py-20 text-gray-400">Booking not found</div>;
+    return <div className="text-center py-20 text-gray-400">{t('book.noDetails')}</div>;
   }
 
   const statusColors = {
@@ -299,9 +295,8 @@ export default function BookingDetails() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Booking Details</h2>
+      <h2 className="text-xl font-bold text-gray-900">{t('book.details')}</h2>
 
-      {/* Header card */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -309,7 +304,7 @@ export default function BookingDetails() {
             <p className="text-sm text-gray-500">{booking.bookingNumber} • {booking.serviceSnapshot?.category}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`badge px-3 py-1 ${statusColors[booking.status]}`}>{booking.status}</span>
+            <span className={`badge px-3 py-1 ${statusColors[booking.status]}`}>{t(`status.${booking.status}`)}</span>
             {booking.paymentStatus && booking.paymentStatus !== 'UNPAID' && (
               <span className={`badge px-3 py-1 ${
                 booking.paymentStatus === 'PAID'
@@ -320,7 +315,7 @@ export default function BookingDetails() {
                   ? 'bg-red-100 text-red-700'
                   : 'bg-gray-100 text-gray-600'
               }`}>
-                {booking.paymentStatus === 'PAID' ? 'Payment Received' : booking.paymentStatus}
+                {booking.paymentStatus === 'PAID' ? t('book.paymentReceived') : booking.paymentStatus}
               </span>
             )}
           </div>
@@ -328,31 +323,30 @@ export default function BookingDetails() {
 
         {booking.isEmergency && (
           <div className="p-2 bg-orange-50 rounded-lg mb-4 text-sm text-orange-700 font-medium">
-            ⚡ Emergency: {booking.emergencyType || 'Not specified'}
+            ⚡ {t('book.emergencyCard', { type: booking.emergencyType || t('book.notSpecified') })}
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
           <div>
-            <p className="font-medium">Date/Time:</p>
+            <p className="font-medium">{t('book.dateTime')}:</p>
             <p>{new Date(booking.requestedDate).toLocaleString()}</p>
             <p>{booking.timeSlot}</p>
           </div>
           <div>
-            <p className="font-medium">Location:</p>
-            <p>{booking.address || 'Not provided'}</p>
+            <p className="font-medium">{t('book.location')}:</p>
+            <p>{booking.address || t('book.notProvided')}</p>
           </div>
         </div>
 
         {booking.description && (
           <div className="mt-4">
-            <p className="font-medium text-sm text-gray-600 mb-1">Description:</p>
+            <p className="font-medium text-sm text-gray-600 mb-1">{t('book.description')}:</p>
             <p className="text-sm text-gray-500">{booking.description}</p>
           </div>
         )}
       </div>
 
-      {/* No-show / reassignment / expiry banner */}
       {['WORKER_NO_SHOW', 'REASSIGNED', 'EXPIRED'].includes(booking.status) && (
         <div className="card border-red-200 bg-red-50/50">
           <div className="flex items-start gap-3">
@@ -360,28 +354,28 @@ export default function BookingDetails() {
             <div className="flex-1">
               <h4 className="font-semibold text-red-700">
                 {booking.status === 'WORKER_NO_SHOW'
-                  ? 'The assigned worker did not arrive'
+                  ? t('book.noShowTitle')
                   : booking.status === 'REASSIGNED'
-                  ? 'The assigned worker did not arrive — finding a replacement'
-                  : 'This booking expired'}
+                  ? t('book.reassignTitle')
+                  : t('book.expiredTitle')}
               </h4>
               <p className="text-sm text-gray-600 mt-1">
-                Unfortunately, the assigned worker did not arrive for your job. Please choose how you&apos;d like to proceed:
+                {t('book.noShowBody')}
               </p>
               <div className="flex flex-wrap gap-3 mt-4">
                 <button onClick={handleReassign} className="btn-primary text-sm">
-                  🔄 Find Another Worker
+                  🔄 {t('book.findAnotherWorker')}
                 </button>
                 <button onClick={handleCancel} className="btn-danger text-sm">
-                  ✕ Cancel &amp; Request Refund
+                  ✕ {t('book.cancelRefund')}
                 </button>
                 <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">
-                  📞 Contact Support
+                  📞 {t('book.contactSupport')}
                 </button>
                 {(booking.failedJobReason || booking.noShowDetectedAt) && (
                   <span className="text-xs text-gray-400 self-center">
                     {booking.noShowDetectedAt
-                      ? `No-show detected ${new Date(booking.noShowDetectedAt).toLocaleString()}`
+                      ? `${t('book.noShowDetected')} ${new Date(booking.noShowDetectedAt).toLocaleString()}`
                       : ''}
                   </span>
                 )}
@@ -391,27 +385,25 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Worker */}
       {booking.worker && (
         <div className="card">
-          <h4 className="font-semibold mb-2">Assigned Worker</h4>
-          <p className="text-sm text-gray-600">Worker ID: {booking.worker._id}</p>
-          <p className="text-sm text-gray-600">Verification: {booking.worker.verificationStatus}</p>
+          <h4 className="font-semibold mb-2">{t('book.assignedWorker')}</h4>
+          <p className="text-sm text-gray-600">{t('book.workerId')}: {booking.worker._id}</p>
+          <p className="text-sm text-gray-600">{t('book.verification')}: {booking.worker.verificationStatus}</p>
           {booking.worker.rating > 0 && (
-            <p className="text-sm text-gray-600">Rating: ⭐ {booking.worker.rating?.toFixed(1)} ({booking.worker.ratingCount} reviews)</p>
+            <p className="text-sm text-gray-600">{t('book.rating')}: ⭐ {booking.worker.rating?.toFixed(1)} ({booking.worker.ratingCount})</p>
           )}
           {booking.matchScore && (
-            <p className="text-sm text-gray-600">Match score: {booking.matchScore}/100</p>
+            <p className="text-sm text-gray-600">{t('book.matchScore')}: {booking.matchScore}/100</p>
           )}
         </div>
       )}
 
-      {/* Live Tracking */}
       {booking.worker && TRACKING_STATUSES.includes(booking.status) && booking.location?.coordinates && (
         <div className="card border-green-200">
-          <h4 className="font-semibold mb-1">📍 Live Tracking</h4>
+          <h4 className="font-semibold mb-1">📍 {t('book.liveTracking')}</h4>
           <p className="text-xs text-gray-500 mb-3">
-            Your worker's live location while they are on the way / working (updates every ~10 sec).
+            {t('book.liveTrackingHint')}
           </p>
           <MapComponent
             center={
@@ -420,9 +412,9 @@ export default function BookingDetails() {
                 : [booking.location.coordinates[1], booking.location.coordinates[0]]
             }
             markers={[
-              { lat: booking.location.coordinates[1], lng: booking.location.coordinates[0], label: 'Service location' },
+              { lat: booking.location.coordinates[1], lng: booking.location.coordinates[0], label: t('book.serviceLocation') },
               ...(workerLocation
-                ? [{ lat: workerLocation[1], lng: workerLocation[0], type: 'worker', label: 'Worker' }]
+                ? [{ lat: workerLocation[1], lng: workerLocation[0], type: 'worker', label: t('roles.worker') }]
                 : []),
             ]}
             height="240px"
@@ -431,23 +423,22 @@ export default function BookingDetails() {
           <div className="mt-2">
             {workerLocation ? (
               <p className="text-xs text-gray-500">
-                Last update: {syncedAt?.toLocaleTimeString()}
+                {t('book.lastUpdate')}: {syncedAt?.toLocaleTimeString()}
                 {workerLocation && booking.location?.coordinates
-                  ? ` • ~${haversineKm(booking.location.coordinates, workerLocation).toFixed(1)} km from the job site`
+                  ? ` • ~${haversineKm(booking.location.coordinates, workerLocation).toFixed(1)} ${t('common.kmAway')}`
                   : ''}
               </p>
             ) : (
-              <p className="text-xs text-gray-400">Waiting for worker's location…</p>
+              <p className="text-xs text-gray-400">{t('book.waitingLocation')}</p>
             )}
           </div>
         </div>
       )}
 
-      {/* Candidate workers (during matching / reassignment) */}
       {['MATCHING', 'REASSIGNED'].includes(booking.status) && booking.candidateWorkers?.length > 0 && (
         <div className="card">
           <h4 className="font-semibold mb-2">
-            {booking.status === 'REASSIGNED' ? 'Replacement Workers (awaiting acceptance)' : 'Matched Workers (awaiting acceptance)'}
+            {booking.status === 'REASSIGNED' ? t('book.replacementWorkers') : t('book.matchedWorkers')}
           </h4>
           <div className="space-y-2">
             {booking.candidateWorkers.map((c, i) => (
@@ -460,27 +451,26 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Payment Summary */}
       {booking.priceBreakdown && (
         <div className="card">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold">Payment Summary</h4>
+            <h4 className="font-semibold">{t('book.paymentSummary')}</h4>
             {booking.paymentStatus === 'PAID' && (
-              <span className="badge bg-emerald-100 text-emerald-700">✓ Paid</span>
+              <span className="badge bg-emerald-100 text-emerald-700">✓ {t('book.paidLabel')}</span>
             )}
           </div>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-gray-600">Service Charge</span><span>₹{booking.priceBreakdown.labour || 0}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Material Cost</span><span>₹{booking.priceBreakdown.materials || 0}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">{t('book.serviceCharge2')}</span><span>₹{booking.priceBreakdown.labour || 0}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">{t('book.materialCost')}</span><span>₹{booking.priceBreakdown.materials || 0}</span></div>
             <div className="flex justify-between text-gray-400">
-              <span>Platform Fee (5%) + Cooperative Contribution (2%)</span><span>Included</span>
+              <span>{t('book.feesNote')}</span><span>{t('common.included')}</span>
             </div>
             <hr className="border-gray-200" />
-            <div className="flex justify-between font-bold"><span>Total (all-inclusive)</span><span className="text-brand-600">₹{booking.priceBreakdown.total || 0}</span></div>
+            <div className="flex justify-between font-bold"><span>{t('book.totalInclusive')}</span><span className="text-brand-600">₹{booking.priceBreakdown.total || 0}</span></div>
           </div>
           {booking.priceBreakdown.materials > 0 && (
             <p className="text-xs text-gray-400 mt-2">
-              Material cost shown only after you approved the worker&apos;s request.
+              {t('book.materialNoteAfterApproval')}
             </p>
           )}
           {canPay && (
@@ -489,21 +479,20 @@ export default function BookingDetails() {
               disabled={paying}
               className="btn-primary w-full mt-4 flex items-center justify-center gap-2"
             >
-              {paying ? 'Processing payment…' : `Pay ₹${booking.priceBreakdown.total || 0} securely`}
+              {paying ? t('book.processingPayment') : t('book.paySecurely', { amount: booking.priceBreakdown.total || 0 })}
             </button>
           )}
           {booking.paymentStatus === 'PAID' && (
             <p className="text-xs text-emerald-600 mt-3">
-              ✅ Payment received. Your worker&apos;s earning is held safely and released only after you confirm the job is done.
+              {t('book.paymentHeldNote')}
             </p>
           )}
         </div>
       )}
 
-      {/* Material Requests (worker requested → customer approves/rejects) */}
       {Array.isArray(booking.materialRequests) && booking.materialRequests.length > 0 && (
         <div className="card">
-          <h4 className="font-semibold mb-3">Material Requests</h4>
+          <h4 className="font-semibold mb-3">{t('book.materialRequests')}</h4>
           <div className="space-y-3">
             {booking.materialRequests.map((mr) => {
               const isPending = mr.status === 'pending';
@@ -514,27 +503,27 @@ export default function BookingDetails() {
                   <div className="flex items-center justify-between">
                     <p className="font-medium text-sm">{mr.description}</p>
                     <span className={`badge ${isPending ? 'badge-warning' : isApproved ? 'badge-success' : 'badge-gray'}`}>
-                      {isPending ? 'Pending Customer Approval' : isApproved ? 'Approved' : 'Rejected'}
+                      {isPending ? t('active.pendingApproval') : isApproved ? t('common.confirm') : t('common.cancelled')}
                     </span>
                   </div>
-                  <p className="text-sm mt-1">Cost: ₹{mr.amount}</p>
+                  <p className="text-sm mt-1">{t('book.costLabel')}: ₹{mr.amount}</p>
                   {mr.note && <p className="text-xs text-gray-500 mt-1">Note: {mr.note}</p>}
                   {mr.requestedAt && (
-                    <p className="text-xs text-gray-400 mt-1">Requested: {new Date(mr.requestedAt).toLocaleString()}</p>
+                    <p className="text-xs text-gray-400 mt-1">{t('book.requestedAt')}: {new Date(mr.requestedAt).toLocaleString()}</p>
                   )}
                   {isPending && (
                     <div className="mt-3 p-3 rounded-lg bg-white border border-gray-200">
-                      <p className="font-semibold text-sm text-gray-900">Additional Material Required</p>
-                      <p className="text-sm mt-1">Material: {mr.description}</p>
-                      <p className="text-sm">Cost: ₹{mr.amount}</p>
-                      <p className="text-sm">Current Service Charge: ₹{booking.priceBreakdown?.labour || 0}</p>
-                      <p className="text-sm">New Total: ₹{(booking.priceBreakdown?.labour || 0) + mr.amount}</p>
+                      <p className="font-semibold text-sm text-gray-900">{t('book.additionalMaterialRequired')}</p>
+                      <p className="text-sm mt-1">{t('book.materialName')}: {mr.description}</p>
+                      <p className="text-sm">{t('book.costLabel')}: ₹{mr.amount}</p>
+                      <p className="text-sm">{t('book.currentCharge')}: ₹{booking.priceBreakdown?.labour || 0}</p>
+                      <p className="text-sm">{t('book.newTotal')}: ₹{(booking.priceBreakdown?.labour || 0) + mr.amount}</p>
                       <div className="flex gap-2 mt-3">
-                        <button onClick={() => handleApproveMaterial(mr._id)} className="btn-success text-sm">✓ Approve</button>
-                        <button onClick={() => handleRejectMaterial(mr._id)} className="btn-danger text-sm">✕ Reject</button>
+                        <button onClick={() => handleApproveMaterial(mr._id)} className="btn-success text-sm">✓ {t('common.confirm')}</button>
+                        <button onClick={() => handleRejectMaterial(mr._id)} className="btn-danger text-sm">✕ {t('common.cancel')}</button>
                       </div>
                       <p className="text-xs text-gray-400 mt-2">
-                        Your total only changes after you approve. Rejecting keeps the original service charge.
+                        {t('book.materialDecisionNote')}
                       </p>
                     </div>
                   )}
@@ -545,16 +534,15 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Map */}
       {booking.location?.coordinates && (
         <div className="card">
-          <h4 className="font-semibold mb-3">Location</h4>
+          <h4 className="font-semibold mb-3">{t('book.location')}</h4>
           <MapComponent
             center={[booking.location.coordinates[1], booking.location.coordinates[0]]}
             markers={[{
               lat: booking.location.coordinates[1],
               lng: booking.location.coordinates[0],
-              label: 'Service location',
+              label: t('book.serviceLocation'),
             }]}
             height="200px"
             zoom={15}
@@ -562,40 +550,38 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Actions */}
       <div className="card">
-        <h4 className="font-semibold mb-3">Actions</h4>
+        <h4 className="font-semibold mb-3">{t('book.actions')}</h4>
         <div className="flex flex-wrap gap-3">
           {booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && (
-            <button onClick={handleConfirm} className="btn-success text-sm">Confirm Completion</button>
+            <button onClick={handleConfirm} className="btn-success text-sm">{t('book.confirmCompletion')}</button>
           )}
           {canPay && (
             <button onClick={handlePay} disabled={paying} className="btn-primary text-sm">
-              {paying ? 'Processing…' : 'Pay Now'}
+              {paying ? t('common.loading') : t('book.payNow')}
             </button>
           )}
           {['REQUESTED', 'MATCHING'].includes(booking.status) && (
-            <button onClick={handleCancel} className="btn-danger text-sm">Cancel</button>
+            <button onClick={handleCancel} className="btn-danger text-sm">{t('book.cancelBooking')}</button>
           )}
           {booking.status === 'COMPLETED' && (
-            <button onClick={() => handleReview(5)} className="btn-accent text-sm">⭐ Rate (5 stars)</button>
+            <button onClick={() => handleReview(5)} className="btn-accent text-sm">⭐ {t('book.rate5')}</button>
           )}
           {booking.status === 'COMPLETED' && (
-            <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">⚠ Raise a Complaint</button>
+            <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">⚠ {t('compl.fileComplaint')}</button>
           )}
         </div>
       </div>
 
-      {/* Status timeline */}
       {booking.statusHistory?.length > 0 && (
         <div className="card">
-          <h4 className="font-semibold mb-3">Status History</h4>
+          <h4 className="font-semibold mb-3">{t('book.statusHistory')}</h4>
           <div className="space-y-3">
             {booking.statusHistory.map((sh, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-2 h-2 bg-brand-600 rounded-full mt-1"></div>
                 <div>
-                  <p className="text-sm font-medium">{sh.status}</p>
+                  <p className="text-sm font-medium">{t(`status.${sh.status}`, sh.status)}</p>
                   <p className="text-xs text-gray-500">{new Date(sh.updatedAt).toLocaleString()}</p>
                   {sh.note && <p className="text-xs text-gray-400">{sh.note}</p>}
                 </div>
@@ -605,56 +591,55 @@ export default function BookingDetails() {
         </div>
       )}
 
-      {/* Raise Complaint modal */}
       {showComplaint && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h3 className="font-bold text-gray-900">Raise a Complaint</h3>
+              <h3 className="font-bold text-gray-900">{t('compl.fileComplaint')}</h3>
               <button onClick={() => setShowComplaint(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
             <form onSubmit={submitComplaint} className="p-6 space-y-4">
               <p className="text-sm text-gray-500">
-                Booking {booking.bookingNumber} — your complaint and evidence will only be visible to you and our support team.
+                {t('compl.bookingRef', { number: booking.bookingNumber })}
               </p>
               <div>
-                <label className="text-xs font-medium text-gray-600">Category *</label>
+                <label className="text-xs font-medium text-gray-600">{t('compl.category')} *</label>
                 <select
                   value={complaintForm.category}
                   onChange={(e) => setComplaintForm({ ...complaintForm, category: e.target.value })}
                   className="input-field mt-1"
                 >
-                  <option value="">Select a category</option>
+                  <option value="">{t('common.submit') === 'Submit' ? t('create.selectType') : t('create.selectType')}</option>
                   {COMPLAINT_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
+                    <option key={c.value} value={c.value}>{t(`compl.categories.${c.value}`)}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">Describe the issue *</label>
+                <label className="text-xs font-medium text-gray-600">{t('compl.describeIssue')} *</label>
                 <textarea
                   value={complaintForm.description}
                   onChange={(e) => setComplaintForm({ ...complaintForm, description: e.target.value })}
                   rows={4}
                   maxLength={2000}
                   className="input-field mt-1"
-                  placeholder="What went wrong? Please share as much detail as possible."
+                  placeholder={t('compl.issuePlaceholder')}
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">What would resolve this?</label>
+                <label className="text-xs font-medium text-gray-600">{t('compl.whatResolves')}</label>
                 <select
                   value={complaintForm.preferredResolution}
                   onChange={(e) => setComplaintForm({ ...complaintForm, preferredResolution: e.target.value })}
                   className="input-field mt-1"
                 >
                   {PREFERRED_RESOLUTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                    <option key={r.value} value={r.value}>{t(`compl.resolutions.${r.value}`)}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600">Supporting evidence (photos, docs, short video)</label>
+                <label className="text-xs font-medium text-gray-600">{t('compl.evidence')}</label>
                 <input
                   type="file"
                   multiple
@@ -663,13 +648,13 @@ export default function BookingDetails() {
                   className="mt-1 w-full text-sm text-gray-500 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-brand-50 file:text-brand-700 file:text-sm file:font-medium"
                 />
                 {complaintFiles.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">{complaintFiles.length} file(s) selected</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('compl.selectedFiles', { count: complaintFiles.length })}</p>
                 )}
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowComplaint(false)} className="btn-secondary text-sm">Cancel</button>
+                <button type="button" onClick={() => setShowComplaint(false)} className="btn-secondary text-sm">{t('common.cancel')}</button>
                 <button type="submit" disabled={filingComplaint} className="btn-primary text-sm">
-                  {filingComplaint ? 'Filing…' : 'Submit Complaint'}
+                  {filingComplaint ? t('compl.filing') : t('compl.submitComplaint')}
                 </button>
               </div>
             </form>
@@ -682,7 +667,7 @@ export default function BookingDetails() {
             onClick={() => setChatOpen(true)}
             className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-brand-600 px-5 py-3 text-white shadow-lg hover:bg-brand-700 transition"
           >
-            <span>💬</span> Message worker
+            <span>💬</span> {t('book.messageWorker')}
           </button>
           <ChatPanel bookingId={id} open={chatOpen} onClose={() => setChatOpen(false)} bookingNumber={booking.bookingNumber} />
         </>

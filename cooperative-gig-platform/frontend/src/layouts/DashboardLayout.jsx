@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import LanguageSelector from '../components/LanguageSelector';
 import { HiOutlineBell } from 'react-icons/hi';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function DashboardLayout({ role }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const roleLabel = {
-    customer: 'Customer',
-    worker: 'Worker',
-    admin: 'Cooperative Admin',
+    customer: t('roles.customer'),
+    worker: t('roles.worker'),
+    admin: t('roles.admin'),
   };
 
   return (
@@ -23,10 +26,11 @@ export default function DashboardLayout({ role }) {
         {/* Top bar */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30">
           <div>
-            <h1 className="font-semibold text-gray-800">{roleLabel[role] || 'Dashboard'}</h1>
-            <p className="text-xs text-gray-500">Aman Seva Cooperative</p>
+            <h1 className="font-semibold text-gray-800">{roleLabel[role] || t('nav.dashboard')}</h1>
+            <p className="text-xs text-gray-500">{t('app.name')}</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <LanguageSelector compact />
             <button className="relative p-2 text-gray-500 hover:text-gray-700">
               <HiOutlineBell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>

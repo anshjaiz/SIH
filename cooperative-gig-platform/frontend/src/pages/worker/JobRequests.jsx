@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { getSocket } from '../../services/socket';
 import toast from 'react-hot-toast';
 import MapComponent from '../../components/MapComponent';
 
 export default function JobRequests() {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const timeoutRef = useRef(null);
@@ -33,32 +35,32 @@ export default function JobRequests() {
   const handleAccept = async (id) => {
     try {
       await api.post(`/workers/jobs/${id}/accept`);
-      toast.success('Job accepted!');
+      toast.success(t('toast.jobAccepted'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
   const handleReject = async (id) => {
-    if (!window.confirm('Reject this job?')) return;
+    if (!window.confirm(t('jobs.rejectConfirm'))) return;
     try {
       await api.post(`/workers/jobs/${id}/reject`);
-      toast.success('Job rejected');
+      toast.success(t('toast.jobRejected'));
       load();
     } catch (err) {
-      toast.error(err.message || 'Failed');
+      toast.error(err.message || t('toast.unknownError'));
     }
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Job Requests</h2>
+      <h2 className="text-xl font-bold text-gray-900">{t('jobs.title')}</h2>
 
       {loading ? (
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div></div>
       ) : requests.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">No pending job requests</div>
+        <div className="text-center py-20 text-gray-400">{t('jobs.noJobRequests')}</div>
       ) : (
         <div className="space-y-4">
           {requests.map((job) => (
@@ -67,11 +69,11 @@ export default function JobRequests() {
                 <div>
                   <h3 className="font-semibold">{job.serviceSnapshot?.name}</h3>
                   <p className="text-sm text-gray-500">{job.bookingNumber} • {job.serviceSnapshot?.category}</p>
-                  {job.isEmergency && <span className="badge bg-orange-100 text-orange-700 mt-1">⚡ EMERGENCY</span>}
-                  {job.status === 'REASSIGNED' && <span className="badge bg-purple-100 text-purple-700 mt-1">🔄 Replacement job — original worker no-showed</span>}
+                  {job.isEmergency && <span className="badge bg-orange-100 text-orange-700 mt-1">⚡ {t('jobs.urgent')}</span>}
+                  {job.status === 'REASSIGNED' && <span className="badge bg-purple-100 text-purple-700 mt-1">🔄 {t('jobs.replacementBadge')}</span>}
                   {job.requiredSkillNames?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
-                      <span className="text-xs text-gray-400">Required:</span>
+                      <span className="text-xs text-gray-400">{t('jobs.required')}:</span>
                       {job.requiredSkillNames.map((s, i) => (
                         <span key={i} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">🎯 {s}</span>
                       ))}
@@ -80,7 +82,7 @@ export default function JobRequests() {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-brand-600">₹{job.priceBreakdown?.total}</p>
-                  <p className="text-xs text-gray-500">Match: {job.matchScore}/100</p>
+                  <p className="text-xs text-gray-500">{t('jobs.matchScore', { score: job.matchScore })}</p>
                 </div>
               </div>
 
@@ -91,17 +93,16 @@ export default function JobRequests() {
                 {job.description && <p className="text-gray-500 italic">"{job.description}"</p>}
               </div>
 
-              {/* Match reasons */}
               {job.matchReasons?.length > 0 && (
                 <div className="mt-3 bg-gray-50 p-3 rounded-lg text-xs text-gray-600">
-                  <p className="font-medium mb-1">Why you were matched:</p>
+                  <p className="font-medium mb-1">{t('jobs.matchedWhy')}:</p>
                   {job.matchReasons.map((r, i) => <p key={i}>• {r}</p>)}
                 </div>
               )}
 
               <div className="flex gap-3 mt-4">
-                <button onClick={() => handleAccept(job._id)} className="btn-success flex-1">Accept Job</button>
-                <button onClick={() => handleReject(job._id)} className="btn-danger flex-1">Reject</button>
+                <button onClick={() => handleAccept(job._id)} className="btn-success flex-1">{t('jobs.accept')}</button>
+                <button onClick={() => handleReject(job._id)} className="btn-danger flex-1">{t('jobs.reject')}</button>
               </div>
 
               {job.location?.coordinates && (

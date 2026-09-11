@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   HiOutlineHome, HiOutlineBriefcase, HiOutlineUser, HiOutlineCurrencyRupee,
   HiOutlineHeart, HiOutlineChartBar, HiOutlineCog, HiOutlineLogout,
@@ -15,38 +16,39 @@ const ICON_CLASS = 'w-5 h-5';
 export default function Sidebar({ role, collapsed, setCollapsed }) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const navItems = {
     customer: [
-      { to: '/customer', icon: HiOutlineHome, label: 'Dashboard', end: true },
-      { to: '/customer/services', icon: HiOutlineBriefcase, label: 'Services' },
-      { to: '/customer/bookings', icon: HiOutlineClipboardList, label: 'My Bookings' },
-      { to: '/customer/payments', icon: HiOutlineCurrencyRupee, label: 'Payments' },
-      { to: '/customer/complaints', icon: HiOutlineExclamationTriangle, label: 'My Complaints' },
+      { to: '/customer', icon: HiOutlineHome, label: t('nav.dashboard'), end: true },
+      { to: '/customer/services', icon: HiOutlineBriefcase, label: t('nav.services') },
+      { to: '/customer/bookings', icon: HiOutlineClipboardList, label: t('nav.myBookings') },
+      { to: '/customer/payments', icon: HiOutlineCurrencyRupee, label: t('nav.payments') },
+      { to: '/customer/complaints', icon: HiOutlineExclamationTriangle, label: t('nav.myComplaints') },
     ],
     worker: [
-      { to: '/worker', icon: HiOutlineHome, label: 'Dashboard', end: true },
-      { to: '/worker/jobs', icon: HiOutlineBriefcase, label: 'Job Requests' },
-      { to: '/worker/active', icon: HiOutlineClock, label: 'Active Jobs' },
-      { to: '/worker/history', icon: HiOutlineClipboardList, label: 'Job History' },
-      { to: '/worker/profile', icon: HiOutlineUser, label: 'My Profile' },
-      { to: '/worker/earnings', icon: HiOutlineCurrencyRupee, label: 'Earnings' },
-      { to: '/worker/collaborations', icon: HiOutlineUsers, label: 'Collaborations' },
-      { to: '/worker/complaints', icon: HiOutlineExclamationTriangle, label: 'Complaints' },
-      { to: '/worker/welfare', icon: HiOutlineHeart, label: 'Welfare & Training' },
+      { to: '/worker', icon: HiOutlineHome, label: t('nav.dashboard'), end: true },
+      { to: '/worker/jobs', icon: HiOutlineBriefcase, label: t('nav.jobRequests') },
+      { to: '/worker/active', icon: HiOutlineClock, label: t('nav.activeJobs') },
+      { to: '/worker/history', icon: HiOutlineClipboardList, label: t('nav.jobHistory') },
+      { to: '/worker/profile', icon: HiOutlineUser, label: t('nav.myProfile') },
+      { to: '/worker/earnings', icon: HiOutlineCurrencyRupee, label: t('nav.earnings') },
+      { to: '/worker/collaborations', icon: HiOutlineUsers, label: t('nav.collaborations') },
+      { to: '/worker/complaints', icon: HiOutlineExclamationTriangle, label: t('nav.complaints') },
+      { to: '/worker/welfare', icon: HiOutlineHeart, label: t('nav.welfare') },
     ],
     admin: [
-      { to: '/admin', icon: HiOutlineHome, label: 'Dashboard', end: true },
-      { to: '/admin/workers', icon: HiOutlineUsers, label: 'Workers' },
-      { to: '/admin/bookings', icon: HiOutlineClipboardList, label: 'Bookings' },
-      { to: '/admin/payments', icon: HiOutlineCurrencyRupee, label: 'Payments' },
-      { to: '/admin/complaints', icon: HiOutlineExclamationTriangle, label: 'Complaints' },
-      { to: '/admin/analytics', icon: HiOutlineChartBar, label: 'Analytics' },
-      { to: '/admin/demand', icon: HiOutlineMap, label: 'Demand Heatmap' },
-      { to: '/admin/forecast', icon: HiOutlineFire, label: 'AI Forecasting' },
-      { to: '/admin/reliability', icon: HiOutlineShieldCheck, label: 'Reliability' },
-      { to: '/admin/welfare', icon: HiOutlineHeart, label: 'Worker Welfare' },
-      { to: '/admin/settings', icon: HiOutlineCog, label: 'Settings' },
+      { to: '/admin', icon: HiOutlineHome, label: t('nav.dashboard'), end: true },
+      { to: '/admin/workers', icon: HiOutlineUsers, label: t('nav.workers') },
+      { to: '/admin/bookings', icon: HiOutlineClipboardList, label: t('nav.bookings') },
+      { to: '/admin/payments', icon: HiOutlineCurrencyRupee, label: t('nav.payments') },
+      { to: '/admin/complaints', icon: HiOutlineExclamationTriangle, label: t('nav.complaints') },
+      { to: '/admin/analytics', icon: HiOutlineChartBar, label: t('nav.analytics') },
+      { to: '/admin/demand', icon: HiOutlineMap, label: t('nav.demandHeatmap') },
+      { to: '/admin/forecast', icon: HiOutlineFire, label: t('nav.aiForecasting') },
+      { to: '/admin/reliability', icon: HiOutlineShieldCheck, label: t('nav.reliability') },
+      { to: '/admin/welfare', icon: HiOutlineHeart, label: t('nav.workerWelfare') },
+      { to: '/admin/settings', icon: HiOutlineCog, label: t('nav.settings') },
     ],
   };
 
@@ -61,8 +63,8 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       <div className="h-16 border-b border-gray-100 flex items-center justify-between px-4">
         {!collapsed && (
           <div className="flex flex-col min-w-0">
-            <span className="font-bold text-brand-700 text-sm truncate">Aman Seva</span>
-            <span className="text-[10px] text-gray-500 leading-tight truncate">Cooperative Gig Platform</span>
+            <span className="font-bold text-brand-700 text-sm truncate">{t('app.name')}</span>
+            <span className="text-[10px] text-gray-500 leading-tight truncate">{t('app.platformTagline')}</span>
           </div>
         )}
         <button onClick={() => setCollapsed(!collapsed)} className="text-gray-500 hover:text-gray-700 p-1 rounded-md">
@@ -98,7 +100,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
           className="sidebar-link w-full text-left text-red-600 hover:bg-red-50 hover:text-red-700"
         >
           <HiOutlineLogout className={ICON_CLASS} />
-          {!collapsed && <span>Logout</span>}
+          {!collapsed && <span>{t('nav.logout')}</span>}
         </button>
       </div>
     </aside>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import useCollaborator from '../../../hooks/useCollaborator';
 import CollaborationInviteCard from '../../../components/collaborator/CollaborationInviteCard';
 import CollaboratorProfileCard from '../../../components/collaborator/CollaboratorProfileCard';
@@ -6,6 +7,7 @@ import MyTeamJobs from '../../../components/collaborator/MyTeamJobs';
 import MySentRequests from '../../../components/collaborator/MySentRequests';
 
 export default function Collaborations() {
+  const { t } = useTranslation();
   const { invites, loading, refresh, respond } = useCollaborator();
   const [tab, setTab] = useState('jobs');
   const [respondingId, setRespondingId] = useState(null);
@@ -17,28 +19,28 @@ export default function Collaborations() {
   };
 
   const tabs = [
-    { id: 'jobs', label: `✅ My Team Jobs` },
-    { id: 'sent', label: `📨 My Requests` },
-    { id: 'invites', label: `🤝 Opportunities${invites.length ? ` (${invites.length})` : ''}` },
+    { id: 'jobs', label: t('collab.tabJobs', '✅ My Team Jobs') },
+    { id: 'sent', label: t('collab.tabSent', '📨 My Requests') },
+    { id: 'invites', label: invites.length ? t('collab.tabInvitesCount', '🤝 Opportunities ({{n}})', { n: invites.length }) : t('collab.tabInvites', '🤝 Opportunities') },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Collaborations</h2>
+        <h2 className="text-xl font-bold text-gray-900">{t('collab.title', 'Collaborations')}</h2>
         <p className="text-sm text-gray-500">
-          Team up with other verified workers on nearby jobs and earn more.
+          {t('collab.subtitle', 'Team up with other verified workers on nearby jobs and earn more.')}
         </p>
       </div>
 
       <div className="flex gap-2">
-        {tabs.map((t) => (
+        {tabs.map((tb) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`badge px-4 py-2 ${tab === t.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            key={tb.id}
+            onClick={() => setTab(tb.id)}
+            className={`badge px-4 py-2 ${tab === tb.id ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
-            {t.label}
+            {tb.label}
           </button>
         ))}
       </div>
@@ -55,8 +57,8 @@ export default function Collaborations() {
         ) : invites.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <div className="text-4xl mb-2">🤝</div>
-            No collaboration invitations yet.
-            When a lead worker needs a teammate, it will show up here in real time.
+            {t('collab.noInvites', 'No collaboration invitations yet.')}
+            <br />{t('collab.noInvitesHint', 'When a lead worker needs a teammate, it will show up here in real time.')}
           </div>
         ) : (
           <div className="space-y-4">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { createCollaborationRequest } from '../../services/collaboratorService';
@@ -16,6 +17,7 @@ const STATUS_COLORS = {
 };
 
 export default function RequestCollaboratorModal({ booking, open, onClose, onCreated }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     role: 'Helper',
     numberOfCollaborators: 1,
@@ -48,7 +50,7 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
     );
 
   const submit = async () => {
-    if (!form.date) return toast.error('Please select a collaboration date');
+    if (!form.date) return toast.error(t('toast.selectCollabDate', 'Please select a collaboration date'));
     setLoading(true);
     try {
       const selectedNames = allSkills
@@ -66,11 +68,11 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
         estimatedPayment: Number(form.estimatedPayment),
         instructions: form.instructions,
       });
-      toast.success(res.message || 'Collaboration request created!');
+      toast.success(res.message || t('toast.collabRequestCreated', 'Collaboration request created!'));
       onCreated && onCreated(res.data);
       onClose();
     } catch (err) {
-      toast.error(err.message || 'Failed to create request');
+      toast.error(err.message || t('toast.failedCreateRequest', 'Failed to create request'));
     }
     setLoading(false);
   };
@@ -80,7 +82,7 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900">👥 Build your Team</h2>
+            <h2 className="text-lg font-bold text-gray-900">👥 {t('collab.buildTeam', 'Build your Team')}</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
           </div>
           <p className="text-sm text-gray-500 mt-1">
@@ -89,13 +91,13 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
 
           <div className="grid grid-cols-2 gap-4 mt-5">
             <div className="col-span-2">
-              <label className="label">Collaborator role</label>
+              <label className="label">{t('collab.collabRole', 'Collaborator role')}</label>
               <select className="input-field" value={form.role} onChange={set('role')}>
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="col-span-2">
-              <label className="label">Required skills (tap to select, optional)</label>
+              <label className="label">{t('collab.requiredSkills', 'Required skills (tap to select, optional)')}</label>
               <div className="flex flex-wrap gap-1.5">
                 {allSkills.map((s) => (
                   <button
@@ -109,43 +111,43 @@ export default function RequestCollaboratorModal({ booking, open, onClose, onCre
                 ))}
               </div>
               {selectedSkillIds.length === 0 && (
-                <p className="text-[11px] text-gray-400 mt-1">No skills chosen → matched by collaborator role only.</p>
+                <p className="text-[11px] text-gray-400 mt-1">{t('collab.noSkillsChosen', 'No skills chosen → matched by collaborator role only.')}</p>
               )}
             </div>
             <div>
-              <label className="label">Team size</label>
+              <label className="label">{t('collab.teamSize', 'Team size')}</label>
               <input type="number" min="1" max="10" className="input-field" value={form.numberOfCollaborators} onChange={set('numberOfCollaborators')} />
             </div>
             <div>
-              <label className="label">Date</label>
+              <label className="label">{t('collab.date', 'Date')}</label>
               <input type="date" className="input-field" value={form.date} onChange={set('date')} />
             </div>
             <div>
-              <label className="label">Start time</label>
+              <label className="label">{t('collab.startTime', 'Start time')}</label>
               <input type="time" className="input-field" value={form.startTime} onChange={set('startTime')} />
             </div>
             <div>
-              <label className="label">Duration (hours)</label>
+              <label className="label">{t('collab.durationHours', 'Duration (hours)')}</label>
               <input type="number" min="1" className="input-field" value={form.durationHours} onChange={set('durationHours')} />
             </div>
             <div className="col-span-2">
-              <label className="label">Estimated payment (₹)</label>
+              <label className="label">{t('collab.estPayment', 'Estimated payment (₹)')}</label>
               <input type="number" min="0" className="input-field" value={form.estimatedPayment} onChange={set('estimatedPayment')} />
             </div>
             <div className="col-span-2">
-              <label className="label">Instructions to collaborators</label>
-              <textarea className="input-field" rows="2" placeholder="What should the team bring / prepare?" value={form.instructions} onChange={set('instructions')} />
+              <label className="label">{t('collab.instructionsToCollabs', 'Instructions to collaborators')}</label>
+              <textarea className="input-field" rows="2" placeholder={t('collab.instructionsPlaceholder', 'What should the team bring / prepare?')} value={form.instructions} onChange={set('instructions')} />
             </div>
           </div>
 
           <div className="mt-6 flex gap-3">
-            <button onClick={onClose} type="button" className="btn-secondary flex-1">Cancel</button>
+            <button onClick={onClose} type="button" className="btn-secondary flex-1">{t('collab.cancel', 'Cancel')}</button>
             <button onClick={submit} disabled={loading} className="btn-primary flex-1">
-              {loading ? 'Matching...' : 'Find Collaborators'}
+              {loading ? t('collab.matching', 'Matching...') : t('collab.findCollabs', 'Find Collaborators')}
             </button>
           </div>
           <p className="text-[11px] text-gray-400 mt-3">
-            Fair-work matching: only verified workers with a matching verified skill near the job are invited.
+            {t('collab.fairWorkNote', 'Fair-work matching: only verified workers with a matching verified skill near the job are invited.')}
           </p>
         </div>
       </div>

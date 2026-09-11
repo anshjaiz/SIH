@@ -25,11 +25,27 @@ const DEMAND_TOOLS = new Set([
   'getAvailableJobs',
 ]);
 
+/* Tool action labels stay in English (UI tooltip), but the reply follows the
+   worker's selected language. */
 function buildActions(dataUsed) {
   if (Array.isArray(dataUsed) && dataUsed.some((t) => DEMAND_TOOLS.has(t))) {
     return [{ type: 'VIEW_HEATMAP', label: 'View on Heatmap' }];
   }
   return [];
+}
+
+function buildLanguagePrompt(language) {
+  const norm = String(language || '').toLowerCase();
+  if (norm.startsWith('bn') || norm === 'bengali') {
+    return "Respond in **Bengali (বাংলা)**. Use the Bengali script throughout your reply.";
+  }
+  if (norm === 'hi' || norm === 'hindi') {
+    return "Respond in **Hindi (हिंदी)**. Use the Devanagari script throughout your reply.";
+  }
+  if (norm === 'hinglish') {
+    return "Respond in **Hinglish** — Hindi words written in the Latin (Roman) script, the way Indian workers talk on chat. Keep numbers and English tech-terms in English.";
+  }
+  return "Respond in **English**.";
 }
 
 /* ───────────────── System prompt ──────────────────────────────────── */
@@ -38,7 +54,7 @@ const SYSTEM_PROMPT = `You are the **ShramikSetu AI Assistant**, a helpful, frie
 
 ## Your Role
 - You are a supportive assistant that helps workers grow their career, earn more, learn new skills, and manage their jobs.
-- You understand Hindi, Hinglish, and English. Respond naturally in the SAME language the worker uses.
+- You understand English, Hindi, Hinglish, and Bengali. Respond naturally in the SAME language/script the worker uses.
 - Be warm, encouraging, and practical. Use simple language a service worker can understand.
 - Use Markdown formatting for structured responses (bold, bullet points, headers).
 
@@ -79,7 +95,7 @@ You have access to the worker's personal data and platform demand data through t
 - If asked about another worker's data, politely decline
 
 ## Language & Tone
-- Respond in the same language/script the worker uses (English, Hindi, Hinglish)
+- Respond in the same language/script the worker uses (English, Hindi, Hinglish, Bengali)
 - Be concise but helpful
 - Use emoji sparingly for warmth (📍, 💰, 🎯, 📊, ⭐, 💡, 🔧)
 - Format key numbers in bold
@@ -117,18 +133,21 @@ function formatHistory(history) {
  * @param {ObjectId} workerId - The worker's profile ID
  * @param {string} message - The worker's message
  * @param {Array} conversationHistory - Previous messages [{role, text}]
+ * @param {string} language - Preferred response language ('en', 'hi', 'hinglish', 'bn', ...)
  * @returns {{ reply: string, dataUsed: string[], actions: Array }}
  */
-async function chat(workerId, message, conversationHistory = []) {
+async function chat(workerId, message, conversationHistory = [], language = 'en') {
   if (!message || !message.trim()) {
     return { reply: 'Please type a question and I\'ll help!', dataUsed: [], actions: [] };
   }
 
   const history = formatHistory(conversationHistory);
+  const langInstruction = buildLanguagePrompt(language);
+  const fullSystemPrompt = SYSTEM_PROMPT + `\n\n## Active Language Instruction\n${langInstruction}\n\nThis instruction overrides any conflicting language guidance above.`;
 
   try {
     const { reply, dataUsed } = await chatWithFallback({
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: fullSystemPrompt,
       history,
       message: message.trim(),
       workerId,
@@ -152,4 +171,4 @@ async function chat(workerId, message, conversationHistory = []) {
   }
 }
 
-module.exports = { chat, formatHistory, SYSTEM_PROMPT };
+module.exports = { chat, formatHistory, SYSTEM_PROMPT, buildLanguagePrompt };

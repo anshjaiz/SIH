@@ -71,6 +71,7 @@ export default function JobRequests() {
                   <p className="text-sm text-gray-500">{job.bookingNumber} • {job.serviceSnapshot?.category}</p>
                   {job.isEmergency && <span className="badge bg-orange-100 text-orange-700 mt-1">⚡ {t('jobs.urgent')}</span>}
                   {job.status === 'REASSIGNED' && <span className="badge bg-purple-100 text-purple-700 mt-1">🔄 {t('jobs.replacementBadge')}</span>}
+                  {job.priceIncreaseCount > 0 && <span className="badge bg-orange-100 text-orange-700 mt-1">🔥 {t('jobs.priceIncreased')}</span>}
                   {job.requiredSkillNames?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className="text-xs text-gray-400">{t('jobs.required')}:</span>
@@ -81,7 +82,8 @@ export default function JobRequests() {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-brand-600">₹{job.priceBreakdown?.total}</p>
+                  <p className="text-lg font-bold text-brand-600">💰 ₹{job.priceBreakdown?.total}</p>
+                  <p className="text-xs font-medium text-gray-600">{t('jobs.youEarn', { amount: job.workerPayout })}</p>
                   <p className="text-xs text-gray-500">{t('jobs.matchScore', { score: job.matchScore })}</p>
                 </div>
               </div>

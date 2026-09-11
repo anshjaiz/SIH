@@ -56,6 +56,8 @@ const notificationSchema = new mongoose.Schema(
         'EARNING_REVERSED',
         'WITHDRAWAL_REQUESTED',
         'WITHDRAWAL_UPDATED',
+        'PRICE_INCREASED',
+        'LOW_ACCEPTANCE',
         'SYSTEM',
       ],
       default: 'SYSTEM',

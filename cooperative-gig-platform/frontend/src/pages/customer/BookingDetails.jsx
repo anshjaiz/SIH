@@ -54,6 +54,10 @@ export default function BookingDetails() {
   const [filingComplaint, setFilingComplaint] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [boostDismissed, setBoostDismissed] = useState(false);
+  const [customBump, setCustomBump] = useState('');
+  const [increasingPrice, setIncreasingPrice] = useState(false);
+  const [boostApplied, setBoostApplied] = useState(null);
 
   const canPay =
     !!booking &&
@@ -209,6 +213,36 @@ export default function BookingDetails() {
     }
   };
 
+  // "Job Boost" — customer raises the price of an open request to attract a
+  // worker. Only ever explicit (customer approves a concrete amount), only on
+  // the SAME booking, never after a worker accepts.
+  const handleIncreasePrice = async (newPriceVal) => {
+    const p = Number(newPriceVal);
+    if (!Number.isFinite(p) || p <= 0) {
+      toast.error(t('boost.invalidPrice'));
+      return;
+    }
+    const currentLabour = booking?.priceBreakdown?.labour || 0;
+    if (p <= currentLabour) {
+      toast.error(t('boost.priceNotHigher'));
+      return;
+    }
+    setIncreasingPrice(true);
+    try {
+      const res = await api.post(`/customers/bookings/${id}/increase-price`, { newPrice: p });
+      if (res.success) {
+        setBoostApplied({ to: p, candidateCount: res.data?.candidateCount ?? 0 });
+        setCustomBump('');
+        toast.success(t('boost.increasedToast', { amount: p }));
+        load();
+      }
+    } catch (err) {
+      toast.error(err.message || t('toast.unknownError'));
+    } finally {
+      setIncreasingPrice(false);
+    }
+  };
+
   const handleApproveMaterial = async (requestId) => {
     try {
       await api.post(`/customers/bookings/${id}/material-request/${requestId}/approve`);
@@ -293,6 +327,31 @@ export default function BookingDetails() {
     REASSIGNED: 'bg-yellow-100 text-yellow-700',
   };
 
+  // Job Boost derived state
+  // An EXPIRED request that was NEVER accepted (no worker, no acceptance) is a
+  // "reopenable" boost: the customer can still raise the price to send it out
+  // again (the backend reopens it to MATCHING), or cancel it. It must never
+  // feel like a dead end.
+  const canReopenExpired = booking.status === 'EXPIRED' && !booking.worker && !booking.acceptedAt;
+  const openForBoost =
+    ['MATCHING', 'REASSIGNED'].includes(booking.status) || canReopenExpired;
+  const currentLabour = booking.priceBreakdown?.labour || 0;
+  const increaseCount = booking.priceIncreaseCount || 0;
+  const boostConfig = booking.priceBoost;
+  const maxIncreases = boostConfig?.maxIncreases ?? 3;
+  const remainingIncreases = boostConfig?.remainingIncreases ?? Math.max(0, maxIncreases - increaseCount);
+  const maxedOut = remainingIncreases <= 0;
+  const lowAcceptance =
+    (!!booking.lowAcceptanceFlaggedAt || canReopenExpired) && openForBoost;
+  const showBoostCard = lowAcceptance && !boostDismissed && !maxedOut;
+  const recommendedBumpPct = boostConfig?.recommendedIncreasePercent ?? 25;
+  const recommendedPrice =
+    currentLabour > 0 ? Math.ceil((currentLabour * (1 + recommendedBumpPct / 100)) / 10) * 10 : 0;
+  const bumpOptions = [20, 50, 100];
+  const elapsedMinutes = booking.createdAt
+    ? Math.max(1, Math.round((Date.now() - new Date(booking.createdAt).getTime()) / 60000))
+    : 0;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <h2 className="text-xl font-bold text-gray-900">{t('book.details')}</h2>
@@ -348,6 +407,30 @@ export default function BookingDetails() {
       </div>
 
       {['WORKER_NO_SHOW', 'REASSIGNED', 'EXPIRED'].includes(booking.status) && (
+        canReopenExpired ? (
+          <div className="card border-orange-200 bg-orange-50/50">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🙁</span>
+              <div className="flex-1">
+                <h4 className="font-semibold text-orange-800">{t('boost.noAcceptanceTitle')}</h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  {t('boost.reopenBody', { count: booking.candidateWorkers?.length || 0 })}
+                </p>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button onClick={() => setBoostDismissed(false)} className="btn-primary text-sm">
+                    💰 {t('boost.increasePrice')}
+                  </button>
+                  <button onClick={handleCancel} className="btn-danger text-sm">
+                    ✕ {t('book.cancelJob')}
+                  </button>
+                  <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">
+                    📞 {t('book.contactSupport')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="card border-red-200 bg-red-50/50">
           <div className="flex items-start gap-3">
             <span className="text-2xl">🙁</span>
@@ -367,7 +450,7 @@ export default function BookingDetails() {
                   🔄 {t('book.findAnotherWorker')}
                 </button>
                 <button onClick={handleCancel} className="btn-danger text-sm">
-                  ✕ {t('book.cancelRefund')}
+                  ✕ {t('book.cancelJob')}
                 </button>
                 <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">
                   📞 {t('book.contactSupport')}
@@ -383,6 +466,7 @@ export default function BookingDetails() {
             </div>
           </div>
         </div>
+        )
       )}
 
       {booking.worker && (
@@ -448,6 +532,105 @@ export default function BookingDetails() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {openForBoost && (
+        <div className="card">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h4 className="font-semibold">{t('boost.requestStatus')}</h4>
+            <span className={`badge px-3 py-1 ${statusColors[booking.status]}`}>{t(`status.${booking.status}`)}</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-gray-500">{t('boost.currentPrice')}</p>
+              <p className="text-lg font-bold text-brand-600">₹{currentLabour}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{t('boost.workersConsidering', { count: booking.candidateWorkers?.length || 0 })}</p>
+              <p className="text-lg font-bold">{booking.candidateWorkers?.length || 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{t('boost.workersDeclined', { count: booking.rejectionsCount || 0 })}</p>
+              <p className="text-lg font-bold text-gray-700">{booking.rejectionsCount || 0}</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">{t('boost.elapsed', { minutes: elapsedMinutes })}</p>
+
+          {boostApplied && (
+            <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+              <p className="font-semibold text-emerald-700">✅ {t('boost.successTitle', { amount: boostApplied.to })}</p>
+              <p className="text-sm text-emerald-700 mt-0.5">
+                {boostApplied.candidateCount > 0 ? t('boost.successBanner') : t('boost.successNoWorkers')}
+              </p>
+            </div>
+          )}
+
+          {showBoostCard && (
+            <div className="mt-4 p-4 rounded-xl border-2 border-orange-200 bg-orange-50">
+              <p className="font-semibold text-orange-800">⚠️ {t('boost.noAcceptanceTitle')}</p>
+              <p className="text-sm text-orange-700 mt-1">{t('boost.noAcceptanceBody')}</p>
+
+              {increaseCount > 0 && booking.priceIncreaseHistory?.length > 0 && (
+                <div className="mt-3 text-xs text-gray-600">
+                  <p className="font-medium text-gray-700">{t('boost.historyTitle')}:</p>
+                  <p>{booking.priceIncreaseHistory.map((h) => `₹${h.from} → ₹${h.to}`).join(' • ')}</p>
+                </div>
+              )}
+
+              <p className="text-sm text-gray-600 mt-3">{t('boost.suggestPrompt')}</p>
+              <p className="text-sm mt-1">
+                <span className="text-gray-600">{t('boost.recommended')}: </span>
+                <span className="font-bold text-gray-900">₹{recommendedPrice}</span>
+                <button
+                  onClick={() => handleIncreasePrice(recommendedPrice)}
+                  disabled={increasingPrice}
+                  className="ml-2 text-sm font-semibold text-brand-700 hover:underline"
+                >
+                  {t('boost.apply')}
+                </button>
+              </p>
+
+              <div className="flex flex-wrap gap-2 mt-3">
+                {bumpOptions.map((bump) => (
+                  <button
+                    key={bump}
+                    onClick={() => handleIncreasePrice(currentLabour + bump)}
+                    disabled={increasingPrice}
+                    className="btn-secondary text-sm"
+                  >
+                    +₹{bump}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="number"
+                  min={currentLabour + 1}
+                  value={customBump}
+                  onChange={(e) => setCustomBump(e.target.value)}
+                  placeholder={t('boost.customPlaceholder')}
+                  className="input-field flex-1"
+                />
+                <button
+                  onClick={() => handleIncreasePrice(Number(customBump))}
+                  disabled={increasingPrice || !customBump}
+                  className="btn-primary text-sm whitespace-nowrap"
+                >
+                  {increasingPrice ? t('common.loading') : t('boost.increasePrice')}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between mt-3">
+                <button onClick={() => setBoostDismissed(true)} className="text-sm text-gray-500 hover:text-gray-700">
+                  {t('boost.keepCurrent')}
+                </button>
+                <span className="text-xs text-gray-400">{t('boost.remainingIncreases', { count: remainingIncreases })}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

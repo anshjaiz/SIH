@@ -84,6 +84,10 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     isEmergency,
     emergencyType,
     priceBreakdown,
+    // Job Boost baseline: the customer-facing labour price starts at the base
+    // price. currentPrice tracks any customer-approved increase.
+    initialPrice: service.basePrice,
+    currentPrice: service.basePrice,
     status: 'REQUESTED',
     statusHistory: [
       {
@@ -232,7 +236,62 @@ const getBookingById = asyncHandler(async (req, res) => {
     throw new ApiError('Not authorized to view this booking', 403);
   }
 
-  res.json({ success: true, data: booking });
+  // Lazy low-acceptance detection on the read path: if the request has been
+  // waiting long enough (or enough workers declined), flag it so the customer
+  // sees the "increase the price?" prompt right away — no need to wait for the
+  // background sweep. Idempotent and non-blocking for the response.
+  const { evaluateAndFlag } = require('../../services/jobBoost/jobBoostService');
+  await evaluateAndFlag(booking).catch(() => {});
+
+  // Surface the Job Boost config so the UI can show remaining increases + the
+  // recommended bump without hard-coding limits on the client.
+  const { getSettings } = require('../../services/jobBoost/jobBoostConfig');
+  const boostSettings = await getSettings();
+
+  const data = booking.toObject();
+  data.priceBoost = {
+    maxIncreases: boostSettings.maxPriceIncreases,
+    recommendedIncreasePercent: boostSettings.recommendedIncreasePercent,
+    remainingIncreases: Math.max(
+      0,
+      boostSettings.maxPriceIncreases - (booking.priceIncreaseCount || 0)
+    ),
+    lowAcceptance:
+      !!booking.lowAcceptanceFlaggedAt &&
+      ['REQUESTED', 'MATCHING', 'REASSIGNED'].includes(booking.status) &&
+      !booking.acceptedAt,
+  };
+
+  res.json({ success: true, data });
+});
+
+// Customer-approved price increase (Job Boost). Same booking, higher price,
+// re-offered to eligible workers. NOT a bidding system — workers only ever
+// Accept or Reject at the price the customer sets.
+const increaseBookingPrice = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError('Booking not found', 404);
+
+  if (booking.customer.toString() !== req.user._id.toString()) {
+    throw new ApiError('Not authorized', 403);
+  }
+
+  const service = await Service.findById(booking.service);
+  if (!service) throw new ApiError('Service not found', 404);
+
+  const { increasePrice } = require('../../services/jobBoost/jobBoostService');
+  const result = await increasePrice({
+    booking,
+    service,
+    newPrice: req.body && req.body.newPrice,
+    requestedBy: req.user._id,
+  });
+
+  res.json({
+    success: true,
+    message: 'Price increased. Sending your request to workers again.',
+    data: result,
+  });
 });
 
 const cancelBooking = asyncHandler(async (req, res) => {
@@ -352,4 +411,5 @@ module.exports = {
   getBookingById,
   cancelBooking,
   requestReassignment,
+  increaseBookingPrice,
 };

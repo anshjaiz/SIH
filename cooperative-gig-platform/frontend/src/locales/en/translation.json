@@ -309,7 +309,7 @@
     "expiredTitle": "This booking expired",
     "noShowBody": "Unfortunately, the assigned worker did not arrive for your job. Please choose how you'd like to proceed:",
     "findAnotherWorker": "Find Another Worker",
-    "cancelRefund": "Cancel & Request Refund",
+    "cancelJob": "Cancel",
     "contactSupport": "Contact Support",
     "noShowDetected": "No-show detected",
     "assignedWorker": "Assigned Worker",
@@ -492,7 +492,9 @@
     "matchScore": "Match Score",
     "matchedWhy": "Why this job matches",
     "required": "Required",
-    "replacementBadge": "Replacement Worker"
+    "replacementBadge": "Replacement Worker",
+    "youEarn": "You'll earn ₹{{amount}}",
+    "priceIncreased": "Price Increased"
   },
   "active": {
     "title": "Active Jobs",
@@ -526,7 +528,9 @@
     "noTeamYet": "No team members yet",
     "pendingApproval": "Pending approval",
     "requestCollab": "Invite Collaborator",
-    "submitting": "Submitting..."
+    "submitting": "Submitting...",
+    "startJob": "Start Job",
+    "scheduledFor": "Scheduled for {{time}}"
   },
   "hist": {
     "title": "Job History",
@@ -980,5 +984,29 @@
         "q": "How do I book a service?"
       }
     }
+  },
+  "boost": {
+    "requestStatus": "Request Status",
+    "currentPrice": "Current Price",
+    "workersConsidering": "{{count}} workers considering",
+    "workersDeclined": "{{count}} declined",
+    "elapsed": "Active for {{minutes}} min",
+    "noAcceptanceTitle": "No worker has accepted your request yet",
+    "noAcceptanceBody": "To get your job accepted faster, you can raise the price. Workers see exactly what they will receive.",
+    "reopenBody": "About {{count}} nearby workers were offered this job and none of them accepted. You can increase the price for the job, or cancel the job.",
+    "suggestPrompt": "Increase the price to attract more workers:",
+    "recommended": "Recommended",
+    "apply": "Apply",
+    "customPlaceholder": "Custom price (₹)",
+    "increasePrice": "Increase Price",
+    "keepCurrent": "Keep Current Price",
+    "remainingIncreases": "{{count}} increases left",
+    "historyTitle": "Price history",
+    "invalidPrice": "Enter a valid price",
+    "priceNotHigher": "New price must be higher than the current price",
+    "increasedToast": "Price increased to ₹{{amount}}",
+    "successTitle": "Price increased to ₹{{amount}}",
+    "successBanner": "Your request has been sent again to available workers nearby.",
+    "successNoWorkers": "No matching workers were available right now. We'll keep looking."
   }
 }

@@ -8,6 +8,7 @@ const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const syncWorkerLocation = require('../../utils/syncWorkerLocation');
 const { getIO } = require('../../config/socket');
 const { computeWorkerEarnings } = require('../../utils/pricingUtils');
+const { requiredSkillNamesForService } = require('../../utils/skillUtils');
 const Cooperative = require('../../models/Cooperative');
 const {
   recordCheckIn,
@@ -128,7 +129,12 @@ const getJobRequests = asyncHandler(async (req, res) => {
     .populate('customer', 'name phone avatar')
     .sort({ isEmergency: -1, createdAt: -1 });
 
-  // Attach match score
+  // Attach match score + exact worker payout. Workers see precisely what they
+  // will receive (net of platform fee + cooperative contribution) so they can
+  // Accept or Reject without bidding or counter-offering.
+  const coop = await Cooperative.findOne().sort({ createdAt: -1 });
+  const coopContributionPercent = coop?.cooperativeContributionPercent ?? 2;
+
   const enriched = requests.map((booking) => {
     const candidate = booking.candidateWorkers.find(
       (c) => c.worker.toString() === worker._id.toString()
@@ -136,6 +142,17 @@ const getJobRequests = asyncHandler(async (req, res) => {
     const b = booking.toObject();
     b.matchScore = candidate ? candidate.score : 0;
     b.matchReasons = candidate ? candidate.reasons : [];
+    b.priceIncreaseCount = b.priceIncreaseCount || 0;
+    b.priceIncreased = (b.priceIncreaseCount || 0) > 0;
+    b.workerPayout = computeWorkerEarnings(
+      b.priceBreakdown?.labour || 0,
+      b.priceBreakdown?.platformFee || 0,
+      coopContributionPercent
+    ).workerNetEarnings;
+    // What the job actually REQUIRES (single core skill), never the matching
+    // superset — so a Fan/Appliance Fix never advertises CCTV/Solar as required.
+    // Derived here from the service snapshot so old bookings are corrected too.
+    b.requiredSkillNames = requiredSkillNamesForService(b.serviceSnapshot);
     return b;
   });
 
@@ -209,11 +226,26 @@ const rejectJob = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
   if (!booking) throw new ApiError('Booking not found', 404);
 
-  // Remove from candidate list
+  // Only a worker the request was actually offered to may reject it — this
+  // also keeps the low-acceptance rejection counter honest.
+  if (!booking.candidateWorkers.some((c) => c.worker.toString() === workerId.toString())) {
+    throw new ApiError('This job was not offered to you', 403);
+  }
+
+  // Remove from candidate list and record the rejection for low-acceptance
+  // detection ("X workers declined — suggest a price increase to the customer").
   booking.candidateWorkers = booking.candidateWorkers.filter(
     (c) => c.worker.toString() !== workerId.toString()
   );
+  booking.rejectionsCount = (booking.rejectionsCount || 0) + 1;
+  booking.lastRejectionAt = new Date();
   await booking.save();
+
+  // If enough workers have declined, flag the request so the customer can
+  // boost the price. Fire-and-forget — never blocks the reject response.
+  require('../../services/jobBoost/jobBoostService')
+    .evaluateAndFlag(booking)
+    .catch((e) => console.error('[job-boost] low acceptance eval error:', e.message));
 
   res.json({ success: true, message: 'Job rejected' });
 });
@@ -283,8 +315,38 @@ const getActiveJobs = asyncHandler(async (req, res) => {
     return !scheduledEndTime || scheduledEndTime.getTime() >= nowMs;
   });
 
+  // Expose the RESOLVED schedule to the worker UI so the "Start Job" gate
+  // works identically for legacy bookings that predate the stored fields.
+  for (const b of activeReady) {
+    const resolved = resolveScheduleTimes(b);
+    if (resolved.scheduledStartTime) b.scheduledStartTime = resolved.scheduledStartTime;
+    if (resolved.scheduledEndTime) b.scheduledEndTime = resolved.scheduledEndTime;
+  }
+
   res.json({ success: true, data: activeReady });
 });
+
+// ── Scheduled-start gate ────────────────────────────────────────────────
+// A scheduled job may only be STARTED (status → STARTED/IN_PROGRESS) once
+// the scheduled window has begun. Validation runs on SERVER time (the
+// database clock), never the worker's device clock. Emergency jobs and
+// legacy bookings without a derivable schedule are always startable.
+const formatClock12 = (d) => {
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  let h = dt.getHours();
+  const m = String(dt.getMinutes()).padStart(2, '0');
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ap}`;
+};
+
+const assertStartTimeReached = (booking) => {
+  const { scheduledStartTime } = resolveScheduleTimes(booking);
+  if (!scheduledStartTime) return; // no schedule → not a scheduled start gate
+  if (Date.now() >= scheduledStartTime.getTime()) return;
+  throw new ApiError(`You can start this job only after ${formatClock12(scheduledStartTime)}.`, 400);
+};
 
 // Start job
 const startJob = asyncHandler(async (req, res) => {
@@ -299,6 +361,9 @@ const startJob = asyncHandler(async (req, res) => {
   if (booking.status !== 'ACCEPTED' && booking.status !== 'ON_THE_WAY' && booking.status !== 'WORKER_ARRIVED') {
     throw new ApiError(`Cannot start job in ${booking.status} status`, 400);
   }
+
+  // Backend guarantee: never start a scheduled job before its start time.
+  assertStartTimeReached(booking);
 
   // Explicit check-in: only the Start button (not app open) records arrival.
   await recordCheckIn(booking, worker, {
@@ -580,6 +645,12 @@ const updateJobStatus = asyncHandler(async (req, res) => {
   const next = allowed[booking.status];
   if (!next || !next.includes(status)) {
     throw new ApiError(`Cannot transition from ${booking.status} to ${status}`, 400);
+  }
+
+  // Starting work (or moving into progress) is only allowed once the
+  // scheduled window has begun — server time.
+  if (['STARTED', 'IN_PROGRESS'].includes(status)) {
+    assertStartTimeReached(booking);
   }
 
   // Arrival / work started = explicit check-in.

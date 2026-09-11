@@ -22,6 +22,15 @@ export default function ActiveJobs() {
   const [materialJob, setMaterialJob] = useState(null);
   const [materialForm, setMaterialForm] = useState({ description: '', amount: '', note: '' });
   const [materialSubmitting, setMaterialSubmitting] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Re-evaluate every second so "Start Job" unlocks automatically the moment
+  // the scheduled start time arrives (also correct after refresh/re-login,
+  // since the schedule is absolute and fetched from the server).
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = async () => {
     try {
@@ -194,6 +203,40 @@ export default function ActiveJobs() {
     IN_PROGRESS: 'bg-green-100 text-green-700',
   };
 
+  const formatClock = (d) => {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    let h = dt.getHours();
+    const m = String(dt.getMinutes()).padStart(2, '0');
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${h}:${m} ${ap}`;
+  };
+
+  // A scheduled job can only be started once its scheduled start time has
+  // arrived (backend enforces the same rule with server time). Jobs without
+  // a schedule (emergency/legacy) are always startable.
+  const canStartJob = (job) => {
+    const start = job.scheduledStartTime ? new Date(job.scheduledStartTime).getTime() : 0;
+    return !start || now >= start;
+  };
+
+  const startJobButton = (job) =>
+    canStartJob(job) ? (
+      <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">
+        {t('active.startJob')} →
+      </button>
+    ) : (
+      <div className="flex-1">
+        <button disabled className="btn-primary w-full opacity-60 cursor-not-allowed">
+          🔒 {t('active.startJob')}
+        </button>
+        <p className="text-xs text-amber-600 font-medium mt-1">
+          📅 {t('active.scheduledFor', { time: formatClock(job.scheduledStartTime) })}
+        </p>
+      </div>
+    );
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-gray-900">{t('active.title')}</h2>
@@ -245,12 +288,10 @@ export default function ActiveJobs() {
                   {job.status === 'ON_THE_WAY' && (
                     <>
                       <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 {t('active.arrived')}</button>
-                      <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 {t('active.startWork')}</button>
+                      {startJobButton(job)}
                     </>
                   )}
-                  {job.status === 'WORKER_ARRIVED' && (
-                    <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 {t('active.startWork')}</button>
-                  )}
+                  {job.status === 'WORKER_ARRIVED' && startJobButton(job)}
                   {['STARTED', 'IN_PROGRESS'].includes(job.status) && (
                     <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ {t('active.completeJob')}</button>
                   )}

@@ -7,8 +7,11 @@
  * Guarantees:
  *  - Idempotent: a global running-flag plus atomic findOneAndUpdate status
  *    guards mean overlapping ticks never double-process a booking.
- *  - Expiry  : jobs stuck in REQUESTED/MATCHING/ASSIGNED (never assigned to a
- *    worker that started) move to EXPIRED after scheduledStartTime + grace.
+ *  - Expiry  : only ASSIGNED bookings (a worker was assigned but never
+ *    started) auto-expire after scheduledStartTime + grace. Requests that were
+ *    NEVER accepted (REQUESTED/MATCHING) are kept open for the customer's
+ *    "Job Boost" (raise the price and re-offer) or for the customer to cancel —
+ *    they must never silently fall into an expired dead-end.
  *  - No-show : an ACCEPTED/ON_THE_WAY job with no worker check-in by
  *    scheduledEndTime + grace becomes WORKER_NO_SHOW, the worker is penalised
  *    and a replacement is sought. If replacement succeeds the booking moves to
@@ -89,14 +92,19 @@ const markExceeded = async (booking, status, note, customerType, customerTitle, 
 };
 
 /**
- * Expire stale, never-started jobs.
+ * Expire stale jobs that had a worker ASSIGNED but never started.
+ *
+ * Never-accepted open requests (REQUESTED/MATCHING) deliberately do NOT expire:
+ * they are served by the "Job Boost" flow — the customer can raise the price
+ * (re-offer to workers) or cancel. Only a booking that already had a worker
+ * assigned and never materialised is a reliability failure we auto-expire.
  * Uses the effective schedule (legacy null-schedule bookings derive one from
  * requestedDate + timeSlot), so pre-scheduling-phase jobs are enforced too.
  */
 const handleExpiredJobs = async (settings, now) => {
   const cutoff = new Date(now.getTime() - settings.jobExpiryGraceMinutes * minuteMs);
   const stale = await Booking.find({
-    status: { $in: ['REQUESTED', 'MATCHING', 'ASSIGNED'] },
+    status: 'ASSIGNED',
     $or: [
       { scheduledStartTime: { $lte: cutoff } },
       { scheduledStartTime: null },
@@ -437,7 +445,7 @@ const runSchedulerOnce = async () => {
   try {
     const settings = await getSettings();
     const now = new Date();
-    const [expired, noShows, retries, reminders, collabNoShows, suspensions, rematch] =
+    const [expired, noShows, retries, reminders, collabNoShows, suspensions, rematch, jobBoost] =
       await Promise.all([
         handleExpiredJobs(settings, now),
         handleNoShows(settings, now),
@@ -446,6 +454,17 @@ const runSchedulerOnce = async () => {
         handleCollaboratorNoShows(settings, now),
         handleExpiredSuspensions(),
         handleRematchOpenBookings(now),
+        // Customer "Job Boost" low-acceptance sweep: flag requests that have
+        // waited too long or been declined too often so the customer sees the
+        // price-increase prompt even when nobody actively rejects.
+        (async () => {
+          try {
+            return await require('../jobBoost/jobBoostService').runLowAcceptanceSweep();
+          } catch (e) {
+            console.error('[job-boost] sweep error:', e.message);
+            return { scanned: 0, flagged: 0, error: e.message };
+          }
+        })(),
       ]);
     return {
       skipped: false,
@@ -456,6 +475,7 @@ const runSchedulerOnce = async () => {
       collabNoShows,
       suspensions,
       rematch,
+      jobBoost,
     };
   } finally {
     running = false;

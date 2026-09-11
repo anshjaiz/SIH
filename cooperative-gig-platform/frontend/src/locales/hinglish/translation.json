@@ -309,7 +309,7 @@
     "expiredTitle": "Ye booking expired ho gayi",
     "noShowBody": "Badkismati se, assigned worker aapke kaam ke liye nahi pahunche. Kripya chunein ki aap aage kya karna chahte hain:",
     "findAnotherWorker": "Doosra worker dhundhein",
-    "cancelRefund": "Cancel karein aur refund maangein",
+    "cancelJob": "Cancel karein",
     "contactSupport": "Support se contact karein",
     "noShowDetected": "No-show detect hua",
     "assignedWorker": "Assigned worker",
@@ -492,7 +492,9 @@
     "matchScore": "Match Score",
     "matchedWhy": "Yeh job kyun match hoti hai",
     "required": "Zaruri",
-    "replacementBadge": "Replacement Worker"
+    "replacementBadge": "Replacement Worker",
+    "youEarn": "Aap kamaayenge ₹{{amount}}",
+    "priceIncreased": "Price Increase Hua"
   },
   "active": {
     "title": "Active Jobs",
@@ -526,7 +528,9 @@
     "noTeamYet": "Abhi koi team member nahi",
     "pendingApproval": "Approval pending hai",
     "requestCollab": "Collaborator invite karein",
-    "submitting": "Submit ho raha hai..."
+    "submitting": "Submit ho raha hai...",
+    "startJob": "Kaam Shuru karein",
+    "scheduledFor": "{{time}} par scheduled"
   },
   "hist": {
     "title": "Job History",
@@ -980,5 +984,29 @@
         "q": "Main service kaise book karu?"
       }
     }
+  },
+  "boost": {
+    "requestStatus": "Request Status",
+    "currentPrice": "Current Price",
+    "workersConsidering": "{{count}} workers soch rahe hain",
+    "workersDeclined": "{{count}} ne mana kiya",
+    "elapsed": "{{minutes}} min se active",
+    "noAcceptanceTitle": "Abhi tak kisi worker ne aapka request accept nahi kiya",
+    "noAcceptanceBody": "Job jaldi accept karane ke liye aap price badha sakte hain. Workers ko exactly pata chalega ki unhe kitna milega.",
+    "reopenBody": "Lagbhag {{count}} paas ke workers ko ye job offer hui thi aur kisi ne accept nahi kiya. Aap job ke liye price badha sakte hain, ya job cancel kar sakte hain.",
+    "suggestPrompt": "Zyada workers ko attract karne ke liye price badhayein:",
+    "recommended": "Recommended",
+    "apply": "Lagao",
+    "customPlaceholder": "Apni price (₹)",
+    "increasePrice": "Price Badhayein",
+    "keepCurrent": "Current Price Rakhein",
+    "remainingIncreases": "{{count}} baar aur badha sakte hain",
+    "historyTitle": "Price history",
+    "invalidPrice": "Sahi price daalein",
+    "priceNotHigher": "Nayi price current price se zyada honi chahiye",
+    "increasedToast": "Price badha kar ₹{{amount}} kar di gayi",
+    "successTitle": "Price badha kar ₹{{amount}} kar di gayi",
+    "successBanner": "Aapka request aas-paas ke available workers ko dobara bhej diya gaya hai.",
+    "successNoWorkers": "Abhi koi matching worker nahi mila. Hum dhoondte rahenge."
   }
 }

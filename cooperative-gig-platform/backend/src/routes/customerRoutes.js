@@ -11,6 +11,7 @@ const {
   getBookingById,
   cancelBooking,
   requestReassignment,
+  increaseBookingPrice,
 } = require('../controllers/customer/bookingController');
 const {
   getInvoiceByBooking,
@@ -55,6 +56,7 @@ router.put('/profile', protect, updateCustomerProfile);
 router.get('/bookings', protect, getBookings);
 router.post('/bookings', protect, upload.array('images', 5), createServiceRequest);
 router.get('/bookings/:id', protect, getBookingById);
+router.post('/bookings/:id/increase-price', protect, increaseBookingPrice);
 router.put('/bookings/:id/cancel', protect, cancelBooking);
 router.post('/bookings/:id/reassign', protect, requestReassignment);
 router.post('/bookings/:id/confirm', protect, confirmCompletion);

@@ -141,6 +141,46 @@ const bookingSchema = new mongoose.Schema(
       platformFee: { type: Number, default: 0 },
       total: { type: Number, default: 0 },
     },
+    // Customer "Job Boost" price increases. The customer-facing labour price
+    // starts at the service base price and may only go UP, and only while the
+    // request is still open for offers (MATCHING / REASSIGNED). Every increase
+    // is customer-approved, recorded in priceIncreaseHistory, recomputes
+    // priceBreakdown (same booking, never a duplicate job), and re-offers the
+    // request to eligible nearby workers. The price is locked as soon as a
+    // worker accepts.
+    initialPrice: {
+      type: Number,
+      default: 0,
+    },
+    currentPrice: {
+      type: Number,
+      default: 0,
+    },
+    priceIncreaseCount: {
+      type: Number,
+      default: 0,
+    },
+    lastPriceIncreaseAt: Date,
+    priceIncreaseHistory: [
+      {
+        from: { type: Number, required: true },
+        to: { type: Number, required: true },
+        increaseAmount: { type: Number, required: true },
+        byUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    // Low-acceptance detection bookkeeping. rejectionsCount counts workers who
+    // rejected the CURRENT offer round (reset on each price increase). The
+    // flag gates the customer-facing "No worker accepted yet — increase the
+    // price?" card; notifiedAt prevents duplicate push notifications.
+    rejectionsCount: {
+      type: Number,
+      default: 0,
+    },
+    lastRejectionAt: Date,
+    lowAcceptanceFlaggedAt: Date,
+    lowAcceptanceNotifiedAt: Date,
     // Material-cost approval flow: the worker requests and the customer
     // explicitly approves/rejects before it counts toward the payable total.
     // Only APPROVED requests are summed into priceBreakdown.materials/total.

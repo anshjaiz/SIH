@@ -51,14 +51,14 @@ function availableAdapters() {
   return adapters;
 }
 
-async function executeToolCall(toolCall, workerId) {
+async function executeToolCall(toolCall, ctxId) {
   const { name, args } = toolCall;
   const handler = toolHandlers[name];
   if (!handler) {
     return { name, response: { error: `Unknown tool: ${name}` } };
   }
   try {
-    const result = await handler(args || {}, workerId);
+    const result = await handler(args || {}, ctxId);
     return { name, response: result };
   } catch (err) {
     console.error(`[AI Assistant] Tool ${name} failed:`, err.message);
@@ -68,16 +68,24 @@ async function executeToolCall(toolCall, workerId) {
 
 /*
  * Run the full tool-calling loop against a single provider.
+ *
+ * `tools`  — tool declarations for this role (defaults to the worker tools).
+ * `ctxId`  — id passed to tool handlers (the worker profile for workers).
+ * `attachments` — optional [{ mimeType, data }] inline image parts sent with
+ *                 the current user message (only providers that support it).
  */
-async function runWithProvider(adapter, { systemPrompt, history, message, workerId }) {
+async function runWithProvider(adapter, { systemPrompt, history, message, ctxId, tools, attachments }) {
   const dataUsed = [];
+  const userMessage = { role: 'user', content: message };
+  if (Array.isArray(attachments) && attachments.length > 0) userMessage.attachments = attachments;
   const messages = [
     ...history.map((h) => ({ role: h.role, content: h.content })),
-    { role: 'user', content: message },
+    userMessage,
   ];
+  const toolSet = Array.isArray(tools) ? tools : toolDeclarations;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await adapter.send({ messages, systemPrompt, tools: toolDeclarations });
+    const res = await adapter.send({ messages, systemPrompt, tools: toolSet });
 
     if (!res.toolCalls || res.toolCalls.length === 0) {
       const text = (res.content || '').trim();
@@ -91,7 +99,7 @@ async function runWithProvider(adapter, { systemPrompt, history, message, worker
 
     for (const tc of res.toolCalls) {
       dataUsed.push(tc.name);
-      const executed = await executeToolCall(tc, workerId);
+      const executed = await executeToolCall(tc, ctxId);
       messages.push({ role: 'tool', toolCallId: tc.id, name: executed.name, response: executed.response });
     }
   }
@@ -109,7 +117,7 @@ async function runWithProvider(adapter, { systemPrompt, history, message, worker
  *   err.code === 'ALL_PROVIDERS_FAILED'  -> every configured provider failed;
  *                                            err.kind holds the last failure kind
  */
-async function chatWithFallback({ systemPrompt, history, message, workerId }) {
+async function chatWithFallback({ systemPrompt, history, message, workerId, tools, contextId, attachments }) {
   const adapters = availableAdapters();
 
   if (adapters.length === 0) {
@@ -121,7 +129,14 @@ async function chatWithFallback({ systemPrompt, history, message, workerId }) {
   let lastKind = 'HTTP';
   for (const adapter of adapters) {
     try {
-      return await runWithProvider(adapter, { systemPrompt, history, message, workerId });
+      return await runWithProvider(adapter, {
+        systemPrompt,
+        history,
+        message,
+        ctxId: contextId || workerId,
+        tools,
+        attachments,
+      });
     } catch (err) {
       lastKind = err?.kind || lastKind;
       console.error(`[AI Assistant] Provider "${adapter.name}" failed (${lastKind}):`, err.message);

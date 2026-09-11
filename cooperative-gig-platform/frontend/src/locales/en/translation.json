@@ -818,7 +818,10 @@
     "description": "We'll use this as your default location so you get matched with nearby jobs only.",
     "dismissLabel": "Skip for now",
     "saving": "Saving...",
-    "save": "Save location"
+    "save": "Save location",
+    "workerTitle": "📍 Is this where you are working today?",
+    "workerDesc": "Update your live location — jobs are shown only within 30 km of where you are.",
+    "workerKeepSaved": "Keep saved location"
   },
   "wallet": {
     "title": "Earnings & Wallet",
@@ -929,5 +932,53 @@
   "role": "Role",
   "script": "Script",
   "startTime": "Start Time",
-  "T": "T"
+  "T": "T",
+  "asst": {
+    "diagnosis": "Diagnosis",
+    "urgency": "Urgency",
+    "normal": "Normal",
+    "high": "High",
+    "emergency": "Emergency",
+    "causes": "Possible causes",
+    "diy": "Safe steps you can try",
+    "noDiy": "Do not attempt this yourself — a certified professional should handle it",
+    "diyRisk": "Care needed",
+    "expert": "Recommended service",
+    "safety": "Safety note",
+    "proRecommended": "A professional should handle this",
+    "bookCta": "Book this service",
+    "browseCta": "Browse services",
+    "errConfigured": "The AI assistant is not configured yet. Please ask the administrator to add a provider API key (e.g. GEMINI_API_KEY).",
+    "errUnavailable": "AI Assistant is temporarily unavailable. Please try again shortly.",
+    "attachPhoto": "Attach a photo of the problem",
+    "removePhoto": "Remove photo",
+    "badImage": "Only JPG, PNG, WebP or GIF images are supported",
+    "bigImage": "Photo is too large (max 3.5 MB)",
+    "photoMessage": "📷 Shared a photo — can you help with this?",
+    "footer": "Get a safe diagnosis, DIY guidance and direct booking — powered by AI."
+  },
+  "home": {
+    "title": "Home & Service Assistant",
+    "subtitle": "Describe a home problem — get safe guidance & book the right service",
+    "welcome": "Hello! I'm your **Home & Service Assistant**. 💧⚡🛠️\n\nTell me about any problem at home — a leaking tap, a power failure, an AC that's not cooling, furniture that needs repair — and I'll guide you safely.\n\nYou can also ask me anything about booking services, payments, or how ShramikSetu works.",
+    "footer": "Powered by AI. Emergency? Call 112 before doing anything risky.",
+    "prompts": {
+      "leak": {
+        "label": "💧 Leaking tap / sink",
+        "q": "My bathroom sink is leaking"
+      },
+      "power": {
+        "label": "⚡ Power / wiring issue",
+        "q": "There is a power problem at home"
+      },
+      "ac": {
+        "label": "🧊 AC / appliance not working",
+        "q": "My air conditioner is not cooling"
+      },
+      "help": {
+        "label": "🛠️ Help me book a service",
+        "q": "How do I book a service?"
+      }
+    }
+  }
 }

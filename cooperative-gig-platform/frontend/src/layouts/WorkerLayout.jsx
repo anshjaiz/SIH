@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import DashboardLayout from './DashboardLayout';
 import LocationModal from '../components/LocationModal';
 import api from '../services/api';
@@ -6,21 +7,18 @@ import { useAuth } from '../context/AuthContext';
 
 export default function WorkerLayout() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [showModal, setShowModal] = useState(false);
   const [initial, setInitial] = useState({});
 
   useEffect(() => {
     const load = async () => {
       if (user?.role !== 'worker') return;
-      // Ask for the live location at most once per browser session so the
-      // modal never keeps blocking the worker dashboard on every visit.
-      if (sessionStorage.getItem('wk_location_prompted') === '1') return;
-      sessionStorage.setItem('wk_location_prompted', '1');
+      // Ask for the live location on every login so the worker can confirm or
+      // update where they are working today (jobs match within 30 km).
       try {
         const res = await api.get('/workers/profile');
         const p = res.data;
-        // Prefill with the saved location, but ALWAYS ask on every login so
-        // the worker can confirm/update their live location for the 30 km radius.
         setInitial({
           address: p.address,
           city: p.city,
@@ -41,11 +39,11 @@ export default function WorkerLayout() {
       {showModal && (
         <LocationModal
           endpoint="/workers/profile"
-          title="📍 Is this where you are working today?"
-          description="Update your live location — jobs are shown only within 30 km of where you are."
+          title={t('loc.workerTitle')}
+          description={t('loc.workerDesc')}
           initial={initial}
           dismissable
-          dismissLabel="Keep saved location"
+          dismissLabel={t('loc.workerKeepSaved')}
           onDone={() => setShowModal(false)}
         />
       )}

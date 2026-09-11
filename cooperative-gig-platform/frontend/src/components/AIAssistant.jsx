@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import api from '../../services/api';
+import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
-const QUICK_PROMPTS = [
+const MAX_IMAGE_BYTES = 3.5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+const WORKER_QUICK_PROMPTS = [
   { labelKey: 'bot.quickPrompts.demand.label', qKey: 'bot.quickPrompts.demand.q' },
   { labelKey: 'bot.quickPrompts.earnings.label', qKey: 'bot.quickPrompts.earnings.q' },
   { labelKey: 'bot.quickPrompts.skills.label', qKey: 'bot.quickPrompts.skills.q' },
@@ -12,7 +17,14 @@ const QUICK_PROMPTS = [
   { labelKey: 'bot.quickPrompts.learn.label', qKey: 'bot.quickPrompts.learn.q' },
 ];
 
-// Safe inline Markdown renderer: **bold**, *italic*, bullet lists, numbered lists, headers.
+const CUSTOMER_QUICK_PROMPTS = [
+  { labelKey: 'home.prompts.leak.label', qKey: 'home.prompts.leak.q' },
+  { labelKey: 'home.prompts.power.label', qKey: 'home.prompts.power.q' },
+  { labelKey: 'home.prompts.ac.label', qKey: 'home.prompts.ac.q' },
+  { labelKey: 'home.prompts.help.label', qKey: 'home.prompts.help.q' },
+];
+
+// Safe inline Markdown renderer: **bold**, *italic*, `code`.
 function renderInline(text) {
   if (!text) return null;
   const parts = [];
@@ -92,53 +104,190 @@ function renderReply(text) {
   return nodes;
 }
 
-export default function WorkerAIAssistant() {
+const URGENCY_STYLES = {
+  emergency: 'bg-red-100 text-red-700 border-red-200',
+  high: 'bg-orange-100 text-orange-700 border-orange-200',
+  normal: 'bg-green-100 text-green-700 border-green-200',
+};
+
+function DiagnosisCard({ d, t, customer }) {
+  const navigate = useNavigate();
+  const urgencyKey = ['emergency', 'high', 'normal'].includes(d.urgency) ? d.urgency : 'normal';
+
+  const handleBook = () => {
+    if (d.serviceId) {
+      navigate(`/customer/services/request/${d.serviceId}`);
+    } else {
+      navigate('/customer/services');
+    }
+  };
+
+  return (
+    <div className="mt-2 pt-2 border-t border-gray-100 rounded-lg space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+          {t('asst.diagnosis')}
+        </span>
+        <span
+          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+            URGENCY_STYLES[urgencyKey] || URGENCY_STYLES.normal
+          }`}
+        >
+          {t('asst.urgency')}: {t(`asst.${urgencyKey}`)}
+        </span>
+      </div>
+
+      {d.safetyWarning && (
+        <div className="flex gap-1.5 p-2 rounded-md bg-red-50 border border-red-200">
+          <span className="shrink-0">⚠️</span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-red-700">{t('asst.safety')}</p>
+            <p className="text-xs text-red-600" style={{ wordBreak: 'break-word' }}>{d.safetyWarning}</p>
+          </div>
+        </div>
+      )}
+
+      {Array.isArray(d.possibleCauses) && d.possibleCauses.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-gray-500">{t('asst.causes')}</p>
+          {d.possibleCauses.map((cause, i) => (
+            <p key={i} className="text-xs text-gray-600 flex gap-1.5">
+              <span className="text-brand-500 shrink-0">•</span>
+              <span className="min-w-0" style={{ wordBreak: 'break-word' }}>{cause}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      {d.diyPossible && Array.isArray(d.diySteps) && d.diySteps.length > 0 ? (
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-gray-500">{t('asst.diy')}</p>
+          {d.diySteps.map((step, i) => (
+            <p key={i} className="text-xs text-gray-600 flex gap-1.5">
+              <span className="text-green-600 shrink-0 font-semibold">{i + 1}.</span>
+              <span className="min-w-0" style={{ wordBreak: 'break-word' }}>{step}</span>
+            </p>
+          ))}
+          {d.diyRiskNote && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+              ⚠️ {t('asst.diyRisk')}: {d.diyRiskNote}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+          ⛔ {t('asst.noDiy')}
+        </p>
+      )}
+
+      {d.professionalHelpRecommended && (
+        <p className="text-xs text-brand-700 bg-brand-50 border border-brand-100 rounded px-2 py-1">
+          🧰 {t('asst.proRecommended')}
+        </p>
+      )}
+
+      {d.recommendedService && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-md bg-gray-50 border border-gray-200">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-gray-500">{t('asst.expert')}</p>
+            <p className="text-sm font-semibold text-gray-800">
+              {d.serviceName || d.recommendedService}
+              {typeof d.basePrice === 'number' && <span className="text-brand-600"> · ₹{d.basePrice}</span>}
+            </p>
+          </div>
+          {customer && (
+            <button onClick={handleBook} className="btn-primary !py-1.5 !px-3 text-xs">
+              {d.serviceId ? t('asst.bookCta') : t('asst.browseCta')}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AIAssistant() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'customer';
+  const endpoint = isCustomer ? '/customers/ai-assistant/chat' : '/workers/ai-assistant/chat';
+  const quickPrompts = isCustomer ? CUSTOMER_QUICK_PROMPTS : WORKER_QUICK_PROMPTS;
+
   const [messages, setMessages] = useState(() => [
     {
       role: 'assistant',
-      text: t('bot.welcome'),
+      text: t(isCustomer ? 'home.welcome' : 'bot.welcome'),
     },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [showQuick, setShowQuick] = useState(true);
+  const [imageData, setImageData] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
+  const handleAttach = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error(t('asst.badImage'));
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error(t('asst.bigImage'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setImageData(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  };
+
   const send = async (text) => {
     const q = (text || '').trim();
-    if (!q || loading) return;
+    if ((!q && !imageData) || loading) return;
 
-    setMessages((prev) => [...prev, { role: 'user', text: q }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', text: q || t('asst.photoMessage') },
+    ]);
     setInput('');
+    setImageData(null);
     setShowQuick(false);
     setLoading(true);
 
-    // Build conversation history for the backend (last N messages)
     const history = messages.slice(-12).map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       text: m.text,
     }));
 
     try {
-      const res = await api.post('/workers/ai-assistant/chat', {
-        message: q,
+      const res = await api.post(endpoint, {
+        message: q || 'Analyse the attached photo and help me with this home/service problem.',
         conversationHistory: history,
         language: i18n.language || 'en',
+        imageData: imageData || undefined,
       });
-      const { reply, dataUsed, actions } = res.data || {};
+
+      const { reply, dataUsed, actions, diagnosis, errorCode } = res?.data || {};
+
+      let text = reply;
+      if (errorCode === 'NO_PROVIDER') text = t('asst.errConfigured');
+      else if (errorCode === 'ALL_PROVIDERS_FAILED') text = t('asst.errUnavailable');
+
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          text: reply || t('bot.couldNotAnswer'),
+          text: text || (!errorCode && t('bot.couldNotAnswer')),
           dataUsed,
           actions: actions || [],
+          diagnosis: diagnosis || null,
         },
       ]);
     } catch (e) {
@@ -162,16 +311,20 @@ export default function WorkerAIAssistant() {
     setMessages([
       {
         role: 'assistant',
-        text: t('bot.cleared'),
+        text: t(isCustomer ? 'home.welcome' : 'bot.cleared'),
       },
     ]);
     setShowQuick(true);
+    setImageData(null);
   };
 
   const handleAction = (action) => {
-    if (action?.type === 'VIEW_HEATMAP') {
+    const type = action?.type;
+    if (type === 'VIEW_HEATMAP') {
       document.getElementById('shramiksetu-demand-heatmap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       window.dispatchEvent(new CustomEvent('shramiksetu:focus-demand'));
+    } else if (type === 'BROWSE_SERVICES') {
+      window.location.href = '/customer/services';
     }
   };
 
@@ -182,17 +335,19 @@ export default function WorkerAIAssistant() {
         <div className="flex items-center gap-2">
           <span className="text-xl">🤖</span>
           <div>
-            <h3 className="font-semibold text-gray-900 leading-tight">{t('bot.title')}</h3>
-            <p className="text-xs text-gray-500">{t('bot.subtitle')}</p>
+            <h3 className="font-semibold text-gray-900 leading-tight">
+              {t(isCustomer ? 'home.title' : 'bot.title')}
+            </h3>
+            <p className="text-xs text-gray-500">{t(isCustomer ? 'home.subtitle' : 'bot.subtitle')}</p>
           </div>
-          <span className="badge badge-info">{t('bot.badge')}</span>
+          {!isCustomer && <span className="badge badge-info">{t('bot.badge')}</span>}
         </div>
         {messages.length > 1 && (
           <button
             onClick={clearChat}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            Clear chat
+            {t('bot.clearChat')}
           </button>
         )}
       </div>
@@ -212,6 +367,9 @@ export default function WorkerAIAssistant() {
               }`}
             >
               {renderReply(m.text)}
+              {m.role === 'assistant' && m.diagnosis && (
+                <DiagnosisCard d={m.diagnosis} t={t} customer={isCustomer} />
+              )}
               {m.role === 'assistant' && (m.dataUsed?.length > 0 || m.actions?.length > 0) && (
                 <div className="mt-2 pt-1.5 border-t border-gray-100 space-y-1.5">
                   {m.dataUsed?.length > 0 && (
@@ -225,8 +383,8 @@ export default function WorkerAIAssistant() {
                       onClick={() => handleAction(a)}
                       className="flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-100 rounded-full px-2.5 py-1 transition-colors"
                     >
-                      <span>🗺️</span>
-                      {a.label || t('bot.viewHeatmap')}
+                      <span>{a.type === 'BROWSE_SERVICES' ? '🧭' : '🗺️'}</span>
+                      {a.type === 'BROWSE_SERVICES' ? t('asst.browseCta') : a.label || t('bot.viewHeatmap')}
                     </button>
                   ))}
                 </div>
@@ -251,7 +409,7 @@ export default function WorkerAIAssistant() {
       {/* Quick prompts — shown initially and after clear */}
       {showQuick && (
         <div className="flex gap-2 flex-wrap mt-3">
-          {QUICK_PROMPTS.map((p) => (
+          {quickPrompts.map((p) => (
             <button
               key={p.labelKey}
               onClick={() => send(t(p.qKey))}
@@ -264,6 +422,20 @@ export default function WorkerAIAssistant() {
         </div>
       )}
 
+      {/* Image preview */}
+      {imageData && (
+        <div className="flex items-center gap-2 mt-3">
+          <img src={imageData} alt="" className="h-12 w-12 object-cover rounded-lg border border-gray-200" />
+          <button
+            type="button"
+            onClick={() => setImageData(null)}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            ✕ {t('asst.removePhoto')}
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <form
         className="flex items-center gap-2 mt-3"
@@ -273,6 +445,22 @@ export default function WorkerAIAssistant() {
         }}
       >
         <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onChange={handleAttach}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={loading}
+          title={t('asst.attachPhoto')}
+          className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+        >
+          📎
+        </button>
+        <input
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -280,13 +468,13 @@ export default function WorkerAIAssistant() {
           className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           disabled={loading}
         />
-        <button type="submit" disabled={loading || !input.trim()} className="btn-primary !py-2 text-sm">
+        <button type="submit" disabled={loading || (!input.trim() && !imageData)} className="btn-primary !py-2 text-sm">
           {t('bot.send')}
         </button>
       </form>
 
       <p className="text-[11px] text-gray-400 mt-2">
-        {t('bot.footer')}
+        {t(isCustomer ? 'home.footer' : 'bot.footer')}
       </p>
     </div>
   );

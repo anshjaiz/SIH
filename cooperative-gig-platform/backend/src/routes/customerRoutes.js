@@ -29,9 +29,23 @@ const {
 } = require('../controllers/shared/materialRequestController');
 const { protect } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/uploadMiddleware');
+const { chatHandler } = require('../controllers/ai/assistantController');
+const rateLimit = require('express-rate-limit');
+
+// Cost control for the AI chatbot: max 10 chat requests per IP per minute.
+const aiChatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many AI requests, please wait a moment and try again' },
+});
 
 // Dashboard (authenticated customer)
 router.get('/dashboard', protect, getDashboard);
+
+// AI Home & Service Assistant (chatbot)
+router.post('/ai-assistant/chat', protect, aiChatLimiter, chatHandler);
 
 // Profile
 router.get('/profile', protect, getCustomerProfile);

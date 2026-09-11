@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import StatsCard from '../../components/StatsCard';
 import AIDemandAssistant from '../../components/worker/AIDemandAssistant';
-import WorkerAIAssistant from '../../components/worker/WorkerAIAssistant';
+import AIAssistant from '../../components/AIAssistant';
 import { HiOutlineBriefcase, HiOutlineCurrencyRupee, HiOutlineClock, HiOutlineStar } from 'react-icons/hi';
 
 export default function WorkerDashboard() {
@@ -50,8 +50,8 @@ export default function WorkerDashboard() {
       {/* AI Demand Assistant + Job Demand Heatmap */}
       <AIDemandAssistant />
 
-      {/* ShramikSetu AI Assistant chatbot */}
-      <WorkerAIAssistant />
+      {/* ShramikSetu AI Home & Service Assistant */}
+      <AIAssistant />
 
       {/* Verification status */}
       {data?.profile?.verificationStatus !== 'VERIFIED' && (

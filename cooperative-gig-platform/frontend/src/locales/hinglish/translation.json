@@ -818,7 +818,10 @@
     "description": "Hum ise aapki default location ke taur pe use karenge taaki aapko sirf paas ke jobs milein.",
     "dismissLabel": "Abhi ke liye chhodein",
     "saving": "Save ho raha hai...",
-    "save": "Location save karein"
+    "save": "Location save karein",
+    "workerTitle": "📍 Kya aaj aap yahin kaam kar rahe hain?",
+    "workerDesc": "Apna live location update karein — job keval aapke aas-paas 30 km ke daayre mein dikhaaye jaate hain.",
+    "workerKeepSaved": "Saved location rakhein"
   },
   "wallet": {
     "title": "Earnings & Wallet",
@@ -929,5 +932,53 @@
   "role": "Role",
   "script": "Script",
   "startTime": "Shuru hone ka Waqt",
-  "T": "T"
+  "T": "T",
+  "asst": {
+    "diagnosis": "Diagnosis",
+    "urgency": "Urgency",
+    "normal": "Normal",
+    "high": "High",
+    "emergency": "Emergency",
+    "causes": "Possible cause",
+    "diy": "Aap ye safe steps try kar sakte ho",
+    "noDiy": "Ise khud try mat karo — ek certified professional hi ise sambhale",
+    "diyRisk": "Dhyan rakhna zaroori",
+    "expert": "Recommended service",
+    "safety": "Safety note",
+    "proRecommended": "Ise kisi professional ko hi sambhalna chahiye",
+    "bookCta": "Ye service book karo",
+    "browseCta": "Services dekho",
+    "errConfigured": "AI assistant abhi configured nahi hai. Admin se kisi provider API key (jaise GEMINI_API_KEY) add karwane ko kaho.",
+    "errUnavailable": "AI assistant abhi temporarily unavailable hai. Thodi der baad dobara try karo.",
+    "attachPhoto": "Problem ki photo add karo",
+    "removePhoto": "Photo hatao",
+    "badImage": "Sirf JPG, PNG, WebP ya GIF images supported hain",
+    "bigImage": "Photo bahut badi hai (max 3.5 MB)",
+    "photoMessage": "📷 Maine ek photo share ki — kya aap help kar sakte ho?",
+    "footer": "Safe diagnosis, DIY guidance aur direct booking — AI dwara."
+  },
+  "home": {
+    "title": "Home & Service Assistant",
+    "subtitle": "Ghar ki koi problem batao — safe guidance pao aur sahi service book karo",
+    "welcome": "Namaste! Main aapka **Home & Service Assistant** hoon. 💧⚡🛠️\n\nGhar ki koi bhi problem batao — tap ka leak, bijli ki kharabi, AC ka thanda na karna, toota furniture — main aapko safe tarike se guide karunga.\n\nAap services book karne, payment ya ShramikSetu ke baare mein bhi kuch bhi pooch sakte ho.",
+    "footer": "AI dwara chalaya jata hai. Emergency? Koi risky kaam karne se pehle 112 pe call karo.",
+    "prompts": {
+      "leak": {
+        "label": "💧 Leak hote tap / sink",
+        "q": "Mere bathroom ka sink leak ho raha hai"
+      },
+      "power": {
+        "label": "⚡ Bijli / wiring problem",
+        "q": "Ghar mein bijli ki problem hai"
+      },
+      "ac": {
+        "label": "🧊 AC / appliance kharab",
+        "q": "Mera air conditioner thanda nahi kar raha hai"
+      },
+      "help": {
+        "label": "🛠️ Service book karne mein help karo",
+        "q": "Main service kaise book karu?"
+      }
+    }
+  }
 }

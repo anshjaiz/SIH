@@ -95,7 +95,16 @@ function createGeminiAdapter({ apiKey, model }) {
       for (const msg of messages) {
         if (msg.role === 'system') continue; // handled via systemInstruction
         if (msg.role === 'user') {
-          contents.push({ role: 'user', parts: [{ text: msg.content }] });
+          const parts = [];
+          if (Array.isArray(msg.attachments) && msg.attachments.length > 0) {
+            for (const att of msg.attachments) {
+              if (att && att.mimeType && att.data) {
+                parts.push({ inlineData: { mimeType: att.mimeType, data: att.data } });
+              }
+            }
+          }
+          parts.push({ text: msg.content });
+          contents.push({ role: 'user', parts });
         } else if (msg.role === 'assistant') {
           if (msg.toolCalls && msg.toolCalls.length > 0) {
             contents.push({

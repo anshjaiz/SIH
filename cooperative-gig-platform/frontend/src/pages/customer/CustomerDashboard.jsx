@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import StatsCard from '../../components/StatsCard';
 import MapComponent from '../../components/MapComponent';
+import AIAssistant from '../../components/AIAssistant';
 import {
   HiOutlineBriefcase, HiOutlineCurrencyRupee, HiOutlineClock,
   HiOutlineCheckCircle,
@@ -84,6 +85,9 @@ export default function CustomerDashboard() {
           {t('create.browseServices')}
         </Link>
       </div>
+
+      {/* AI Home & Service Assistant */}
+      <AIAssistant />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">

@@ -33,7 +33,7 @@ const {
   getMyAppeals,
 } = require('../controllers/reliability/workerReliabilityController');
 const { getDemandAssistant } = require('../controllers/worker/workerDemandController');
-const { chatHandler } = require('../controllers/worker/workerAssistantController');
+const { chatHandler } = require('../controllers/ai/assistantController');
 const {
   submitMaterialRequest,
 } = require('../controllers/shared/materialRequestController');

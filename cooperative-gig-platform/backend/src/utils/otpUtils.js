@@ -1,5 +1,9 @@
 const crypto = require('crypto');
 
+// Single source of truth for the OTP lifetime (used for expiry checks AND so
+// the verification email always states the real expiration window).
+const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 // Cryptographically secure 6-digit OTP (never uses Math.random).
 const generateSecureOtp = () => String(crypto.randomInt(100000, 1000000));
 
@@ -30,4 +34,4 @@ const maskEmail = (email) => {
   return `${first}${stars}${e.slice(at)}`;
 };
 
-module.exports = { generateSecureOtp, hashOtp, safeEqual, maskEmail };
+module.exports = { OTP_TTL_MS, generateSecureOtp, hashOtp, safeEqual, maskEmail };

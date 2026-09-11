@@ -111,6 +111,11 @@ app.use('/api/collaborations', require('./routes/collaboratorRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/routes', require('./routes/routingRoutes'));
 app.use('/api/ai', aiRoutes);
+app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/wallet', require('./routes/walletRoutes'));
+const { payoutMethodRouter, payoutsRouter } = require('./routes/payoutRoutes');
+app.use('/api/payout-methods', payoutMethodRouter);
+app.use('/api/payouts', payoutsRouter);
 
 // Root route
 app.get('/', (req, res) => {

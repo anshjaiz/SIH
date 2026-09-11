@@ -1,28 +1,46 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const env = require('../config/env');
+const { OTP_TTL_MS } = require('../utils/otpUtils');
 const { ApiError } = require('../middleware/errorMiddleware');
 
-let client = null;
+// Reusable Gmail SMTP transporter, created lazily from EMAIL_USER /
+// EMAIL_APP_PASSWORD. Credentials are read from env ONLY and are never
+// exposed to the API layer.
+let transporter = null;
 
-const getClient = () => {
-  if (!env.resendApiKey) return null;
-  if (!client) client = new Resend(env.resendApiKey);
-  return client;
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: env.emailUser,
+        pass: env.emailAppPassword,
+      },
+    });
+  }
+  return transporter;
 };
 
 /**
- * Send a 6-digit verification code email via Resend.
- * Throws a friendly ApiError on any failure — Resend internals are never
- * surfaced to the client.
+ * Send a 6-digit verification code email via Gmail SMTP (Nodemailer).
+ * Returns { delivered: true } on success, or { delivered: false, otp }
+ * when OTP_CONSOLE_FALLBACK is enabled and delivery failed (DEV ONLY).
+ * On failure with the fallback OFF, throws a friendly ApiError — Gmail
+ * internals and credentials are never surfaced to the client.
  */
 const sendOtpEmail = async ({ toEmail, otp, name }) => {
-  const resend = getClient();
-  if (!resend || !env.emailFrom) {
-    throw new ApiError('Unable to send verification email right now. Please try again.', 502);
+  if (!env.emailUser || !env.emailAppPassword) {
+    return devFallback({
+      toEmail,
+      otp,
+      reason: 'EMAIL_USER / EMAIL_APP_PASSWORD not configured',
+    });
   }
 
-  const { data, error } = await resend.emails.send({
-    from: env.emailFrom,
+  const minutes = Math.round(OTP_TTL_MS / 60000);
+
+  const mailOptions = {
+    from: `"ShramikSetu" <${env.emailUser}>`,
     to: toEmail,
     subject: 'Verify your ShramikSetu account',
     html: `<!DOCTYPE html>
@@ -41,11 +59,11 @@ const sendOtpEmail = async ({ toEmail, otp, name }) => {
             <tr>
               <td style="padding:16px 28px;">
                 <p style="margin:0;font-size:14px;color:#374151;">Hi ${name || 'there'},</p>
-                <p style="margin:14px 0 0;font-size:14px;color:#374151;">Use the code below to verify your email address. It expires in <strong>5 minutes</strong>.</p>
+                <p style="margin:14px 0 0;font-size:14px;color:#374151;">Use the code below to verify your email address. It expires in <strong>${minutes} minutes</strong>.</p>
                 <p style="margin:22px 0 0;text-align:center;">
                   <span style="display:inline-block;background:#eef2ff;color:#4338ca;font-size:30px;font-weight:bold;letter-spacing:8px;padding:12px 22px;border-radius:10px;">${otp}</span>
                 </p>
-                <p style="margin:22px 0 0;font-size:12px;color:#9ca3af;">If you did not create this account, you can safely ignore this email.</p>
+                <p style="margin:22px 0 0;font-size:12px;color:#9ca3af;">For your security, never share this code with anyone. ShramikSetu will never ask you for it.</p>
               </td>
             </tr>
           </table>
@@ -54,12 +72,36 @@ const sendOtpEmail = async ({ toEmail, otp, name }) => {
     </table>
   </body>
 </html>`,
-  });
+  };
 
-  if (error) {
-    throw new ApiError('Unable to send verification email right now. Please try again.', 502);
+  try {
+    await getTransporter().sendMail(mailOptions);
+    // DEV convenience (OTP_CONSOLE_FALLBACK=true): mirror the code we just
+    // emailed so demos can complete registration without opening the inbox.
+    if (env.otpConsoleFallback) {
+      console.warn(`[DEV] OTP emailed to ${toEmail} = ${otp}`);
+    }
+    return { delivered: true };
+  } catch (error) {
+    // Log server-side for diagnosis (App Password must never reach the client).
+    console.error(
+      `[email] OTP send to ${toEmail} failed: ${error.responseCode || error.code || ''}` +
+        (error.response ? ` — ${String(error.response).slice(0, 200)}` : '') +
+        ` (${error.message || 'unknown error'})`
+    );
+    return devFallback({ toEmail, otp, reason: error.message });
   }
-  return data;
+};
+
+// DEV ONLY (OTP_CONSOLE_FALLBACK=true): when SMTP delivery fails, surface the
+// OTP on the server console (and, via { delivered:false }, to the request
+// response) so local demos still register without a working mail account.
+const devFallback = ({ toEmail, otp, reason }) => {
+  if (!env.otpConsoleFallback) {
+    throw new ApiError('Unable to send the verification email right now. Please try again in a moment.', 502);
+  }
+  console.warn(`[DEV] OTP for ${toEmail} (email delivery unavailable — ${reason || 'SMTP failure'}): code = ${otp}`);
+  return { delivered: false, otp };
 };
 
 module.exports = { sendOtpEmail };

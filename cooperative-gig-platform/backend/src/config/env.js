@@ -13,8 +13,26 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientURL: process.env.CLIENT_URL || 'http://localhost:5173',
   osrmBaseUrl: process.env.OSRM_BASE_URL || 'https://router.project-osrm.org',
-  resendApiKey: process.env.RESEND_API_KEY || '',
-  emailFrom: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+  // ── Email verification OTPs (Gmail SMTP via Nodemailer) ──────────────
+  // Gmail account that sends the OTPs. pass is a Google App Password
+  // (https://myaccount.google.com/apppasswords) — 16 chars, no spaces.
+  // Config is read from env only; credentials are never exposed to the API.
+  emailUser: process.env.EMAIL_USER || '',
+  emailAppPassword: String(process.env.EMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
+  // DEV ONLY: when the SMTP send fails (e.g. app password not set yet), log
+  // + return the OTP so registration keeps working in local demos. NEVER
+  // enable in production.
+  otpConsoleFallback: ['true', '1'].includes(String(process.env.OTP_CONSOLE_FALLBACK || '').toLowerCase()),
+
+  // ── Payments (Razorpay TEST mode) ──────────────────────────────────
+  // Leave RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET empty to run the
+  // built-in MOCK gateway (instant success, safe for offline demo).
+  // Sever-side only — never expose the secret to the frontend.
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID || '',
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || '',
+  // Platform fee % override. When empty, the fee is read from the live
+  // Cooperative settings collection (admin-configurable) instead.
+  platformFeePercent: parseFloat(process.env.PLATFORM_FEE_PERCENTAGE) || 0,
 
   // ── AI Assistant providers ──────────────────────────────────────────
   // Provider API keys (added by the administrator; never hardcoded).

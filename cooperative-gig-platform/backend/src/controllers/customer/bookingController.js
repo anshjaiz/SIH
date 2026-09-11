@@ -283,6 +283,36 @@ const cancelBooking = asyncHandler(async (req, res) => {
     }
   }
 
+  // Refund any money already paid for this booking. The gateway refund is
+  // simulated in TEST mode (Razorpay refund attempted when test keys exist)
+  // and any held/released worker earning is reversed in the wallet ledger.
+  if (booking.payment && ['PAID', 'SUCCESS'].includes(booking.paymentStatus)) {
+    const { initiateRefund } = require('../../services/payment/paymentService');
+    try {
+      const refund = await initiateRefund(booking.payment, {
+        initiatedBy: req.user._id,
+        method: 'MOCK_REFUND',
+        amount: booking.priceBreakdown?.total || undefined,
+      });
+      booking.statusHistory.push({
+        status: 'CANCELLED',
+        updatedAt: new Date(),
+        updatedBy: req.user._id,
+        note: `Refund initiated (${refund.refundNumber || refund._id})`,
+      });
+      await booking.save();
+      await Notification.create({
+        user: booking.customer,
+        type: 'REFUND_STATUS',
+        title: 'Refund initiated',
+        message: `Your refund of ₹${refund.amount} for ${booking.bookingNumber} is being processed.`,
+        data: { bookingId: booking._id, refundId: refund._id, refundNumber: refund.refundNumber },
+      });
+    } catch (e) {
+      console.error('[refund] cancellation refund error:', e.message);
+    }
+  }
+
   res.json({ success: true, message: 'Booking cancelled', data: booking });
 });
 

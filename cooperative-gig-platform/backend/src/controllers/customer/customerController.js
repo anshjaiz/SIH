@@ -45,7 +45,7 @@ const getDashboard = asyncHandler(async (req, res) => {
   // Total spending
   const payments = await Payment.find({
     customer: customerId,
-    status: 'SUCCESS',
+    status: { $in: ['PAID', 'SUCCESS'] },
   });
 
   const totalSpending = payments.reduce((sum, p) => sum + p.amount, 0);

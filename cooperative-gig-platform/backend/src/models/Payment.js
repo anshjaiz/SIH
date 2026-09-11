@@ -50,18 +50,39 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       default: 'mock', // 'mock' | 'razorpay' | 'other'
     },
+    // Razorpay order + verification (server-side signature check)
+    razorpayOrderId: {
+      type: String,
+      index: true,
+    },
+    razorpayPaymentId: {
+      type: String,
+    },
+    razorpaySignature: {
+      type: String,
+    },
     transactionId: {
       type: String,
       unique: true,
+      sparse: true,
     },
     status: {
       type: String,
-      enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'],
+      // 'PAID' is the new canonical success status; 'SUCCESS' is kept so
+      // records created by the earlier mock gateway stay readable.
+      enum: ['PENDING', 'CREATED', 'PAID', 'FAILED', 'REFUNDED', 'CANCELLED', 'SUCCESS'],
       default: 'PENDING',
       index: true,
     },
     paymentDate: Date,
+    completedAt: Date,
+    paidAt: Date,
     refundedAt: Date,
+    cancelledAt: Date,
+    failureReason: {
+      type: String,
+      default: '',
+    },
     // Shared earnings breakdown with worker
     workerGross: {
       type: Number,

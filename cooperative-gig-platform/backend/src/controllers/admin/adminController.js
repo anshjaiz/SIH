@@ -41,11 +41,11 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     Booking.countDocuments({ status: 'COMPLETED' }),
     Booking.countDocuments({ status: { $in: ['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'REASSIGNED'] } }),
     Payment.aggregate([
-      { $match: { status: 'SUCCESS' } },
+      { $match: { status: { $in: ['PAID', 'SUCCESS'] } } },
       { $group: { _id: null, revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
     ]),
     Payment.aggregate([
-      { $match: { status: 'SUCCESS' } },
+      { $match: { status: { $in: ['PAID', 'SUCCESS'] } } },
       { $group: { _id: null, total: { $sum: '$workerNetEarnings' } } },
     ]),
     Complaint.find({ status: { $ne: 'RESOLVED' } }),
@@ -73,7 +73,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   const dailyRevenue = await Payment.aggregate([
     {
       $match: {
-        status: 'SUCCESS',
+        status: { $in: ['PAID', 'SUCCESS'] },
         paymentDate: { $gte: startOfMonth },
       },
     },
@@ -165,7 +165,7 @@ const getWorkerDetail = asyncHandler(async (req, res) => {
 
   // Earnings
   const earnings = await Payment.aggregate([
-    { $match: { worker: worker._id, status: 'SUCCESS' } },
+    { $match: { worker: worker._id, status: { $in: ['PAID', 'SUCCESS'] } } },
     { $group: { _id: null, total: { $sum: '$workerNetEarnings' }, count: { $sum: 1 } } },
   ]);
 

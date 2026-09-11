@@ -21,6 +21,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/customer', icon: HiOutlineHome, label: 'Dashboard', end: true },
       { to: '/customer/services', icon: HiOutlineBriefcase, label: 'Services' },
       { to: '/customer/bookings', icon: HiOutlineClipboardList, label: 'My Bookings' },
+      { to: '/customer/payments', icon: HiOutlineCurrencyRupee, label: 'Payments' },
       { to: '/customer/complaints', icon: HiOutlineExclamationTriangle, label: 'My Complaints' },
     ],
     worker: [
@@ -38,6 +39,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/admin', icon: HiOutlineHome, label: 'Dashboard', end: true },
       { to: '/admin/workers', icon: HiOutlineUsers, label: 'Workers' },
       { to: '/admin/bookings', icon: HiOutlineClipboardList, label: 'Bookings' },
+      { to: '/admin/payments', icon: HiOutlineCurrencyRupee, label: 'Payments' },
       { to: '/admin/complaints', icon: HiOutlineExclamationTriangle, label: 'Complaints' },
       { to: '/admin/analytics', icon: HiOutlineChartBar, label: 'Analytics' },
       { to: '/admin/demand', icon: HiOutlineMap, label: 'Demand Heatmap' },

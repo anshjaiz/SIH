@@ -145,7 +145,7 @@ cooperative-gig-platform/
 - **Role-based access** — Customer / Worker / Admin (Cooperative)
 - **Fair worker matching** — scoring based on skill, distance, availability, rating, experience, **and workload fairness**
 - **Transparent pricing** — full breakdown (labour, materials, cooperative contribution, fees)
-- **Mock payment system** — designed for Razorpay integration later
+- **Payments (Razorpay TEST + MOCK fallback)** — server-verified orders, per-booking price breakdown, automatic invoices, worker wallet with held earnings (released on customer confirmation), withdrawal requests, and an admin payout lifecycle (PENDING → PROCESSING → COMPLETED/FAILED)
 - **Invoices** — generated automatically after completion
 - **Ratings & reviews** — bi-directional (customer ↔ worker), single review per booking
 - **Complaint/dispute management**

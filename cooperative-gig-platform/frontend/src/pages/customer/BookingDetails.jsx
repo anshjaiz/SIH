@@ -8,6 +8,17 @@ import toast from 'react-hot-toast';
 import { COMPLAINT_CATEGORIES, PREFERRED_RESOLUTIONS } from '../../utils/complaints';
 
 const TRACKING_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
+const PAYABLE_STATUSES = ['ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'COMPLETED'];
+
+const loadRazorpayScript = (src = 'https://checkout.razorpay.com/v1/checkout.js') =>
+  new Promise((resolve, reject) => {
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve(true);
+    s.onerror = () => reject(new Error('Could not load the payment gateway. Please try again.'));
+    document.body.appendChild(s);
+  });
 
 // A valid [lng, lat] pair — empty arrays (worker hasn't shared a location) are NOT a location.
 const isValidCoords = (c) =>
@@ -41,6 +52,13 @@ export default function BookingDetails() {
   const [complaintFiles, setComplaintFiles] = useState([]);
   const [filingComplaint, setFilingComplaint] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [paying, setPaying] = useState(false);
+
+  const canPay =
+    !!booking &&
+    booking.paymentStatus !== 'PAID' &&
+    booking.paymentStatus !== 'REFUNDED' &&
+    PAYABLE_STATUSES.includes(booking.status);
 
   const chatEnabled = !!booking && !!booking.worker &&
     ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS', 'COMPLETED'].includes(booking.status);
@@ -114,15 +132,59 @@ export default function BookingDetails() {
 
   const handlePay = async () => {
     try {
-      const res = await api.post('/customers/payments', { bookingId: id, method: 'MOCK_REDIRECT' });
-      if (res.success) {
-        toast.success('Payment successful!');
+      setPaying(true);
+      // 1) Create the order — the backend recomputes the amount from the
+      //    booking's price breakdown and returns the gateway + order id.
+      const res = await api.post('/payments/create-order', { bookingId: id });
+      if (!res.success) throw new Error(res.message || 'Could not create the payment order');
+      const { gateway, key, order, paymentId } = res.data;
+
+      if (gateway === 'mock') {
+        // MOCK gateway — instant success, still verified on the backend.
+        const ver = await api.post('/payments/verify', {
+          razorpay_order_id: order.id,
+          razorpay_payment_id: `mock_${paymentId}_${Date.now()}`,
+          razorpay_signature: 'mock',
+        });
+        toast.success(ver.message || 'Payment successful!');
         load();
-      } else {
-        toast.error('Payment failed');
+        return;
       }
+
+      // 2) Razorpay checkout (real TEST mode when keys are configured).
+      await loadRazorpayScript();
+      const options = {
+        key,
+        amount: order.amount, // paise
+        currency: order.currency,
+        name: 'ShramikSetu Cooperative',
+        description: 'Service payment',
+        order_id: order.id,
+        handler: async (response) => {
+          try {
+            const ver = await api.post('/payments/verify', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            toast.success(ver.message || 'Payment successful!');
+            load();
+          } catch (e) {
+            toast.error(e.message || 'Payment verification failed');
+          }
+        },
+        theme: { color: '#0f766e' },
+        modal: { ondismiss: () => {} },
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (r) => {
+        toast.error(r?.error?.description || 'Payment failed. Your booking was not charged.');
+      });
+      rzp.open();
     } catch (err) {
       toast.error(err.message || 'Payment failed');
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -246,7 +308,22 @@ export default function BookingDetails() {
             <h3 className="text-lg font-bold">{booking.serviceSnapshot?.name}</h3>
             <p className="text-sm text-gray-500">{booking.bookingNumber} • {booking.serviceSnapshot?.category}</p>
           </div>
-          <span className={`badge px-3 py-1 ${statusColors[booking.status]}`}>{booking.status}</span>
+          <div className="flex items-center gap-2">
+            <span className={`badge px-3 py-1 ${statusColors[booking.status]}`}>{booking.status}</span>
+            {booking.paymentStatus && booking.paymentStatus !== 'UNPAID' && (
+              <span className={`badge px-3 py-1 ${
+                booking.paymentStatus === 'PAID'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : booking.paymentStatus === 'REFUNDED'
+                  ? 'bg-orange-100 text-orange-700'
+                  : booking.paymentStatus === 'FAILED'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-gray-100 text-gray-600'
+              }`}>
+                {booking.paymentStatus === 'PAID' ? 'Payment Received' : booking.paymentStatus}
+              </span>
+            )}
+          </div>
         </div>
 
         {booking.isEmergency && (
@@ -386,17 +463,38 @@ export default function BookingDetails() {
       {/* Payment Summary */}
       {booking.priceBreakdown && (
         <div className="card">
-          <h4 className="font-semibold mb-3">Payment Summary</h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-semibold">Payment Summary</h4>
+            {booking.paymentStatus === 'PAID' && (
+              <span className="badge bg-emerald-100 text-emerald-700">✓ Paid</span>
+            )}
+          </div>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-gray-600">Service Charge</span><span>₹{booking.priceBreakdown.labour || 0}</span></div>
             <div className="flex justify-between"><span className="text-gray-600">Material Cost</span><span>₹{booking.priceBreakdown.materials || 0}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Platform Fee</span><span>Included</span></div>
+            <div className="flex justify-between text-gray-400">
+              <span>Platform Fee (5%) + Cooperative Contribution (2%)</span><span>Included</span>
+            </div>
             <hr className="border-gray-200" />
-            <div className="flex justify-between font-bold"><span>Total</span><span className="text-brand-600">₹{booking.priceBreakdown.total || 0}</span></div>
+            <div className="flex justify-between font-bold"><span>Total (all-inclusive)</span><span className="text-brand-600">₹{booking.priceBreakdown.total || 0}</span></div>
           </div>
           {booking.priceBreakdown.materials > 0 && (
             <p className="text-xs text-gray-400 mt-2">
               Material cost shown only after you approved the worker&apos;s request.
+            </p>
+          )}
+          {canPay && (
+            <button
+              onClick={handlePay}
+              disabled={paying}
+              className="btn-primary w-full mt-4 flex items-center justify-center gap-2"
+            >
+              {paying ? 'Processing payment…' : `Pay ₹${booking.priceBreakdown.total || 0} securely`}
+            </button>
+          )}
+          {booking.paymentStatus === 'PAID' && (
+            <p className="text-xs text-emerald-600 mt-3">
+              ✅ Payment received. Your worker&apos;s earning is held safely and released only after you confirm the job is done.
             </p>
           )}
         </div>
@@ -468,14 +566,13 @@ export default function BookingDetails() {
       <div className="card">
         <h4 className="font-semibold mb-3">Actions</h4>
         <div className="flex flex-wrap gap-3">
-          {booking.status === 'COMPLETED' && (
-            <>
-              <button onClick={handleConfirm} className="btn-success text-sm">Confirm Completion</button>
-              <button onClick={handlePay} className="btn-primary text-sm">Pay Now</button>
-            </>
+          {booking.status === 'COMPLETED' && booking.paymentStatus === 'PAID' && (
+            <button onClick={handleConfirm} className="btn-success text-sm">Confirm Completion</button>
           )}
-          {booking.status === 'ACCEPTED' && (
-            <button onClick={handlePay} className="btn-primary text-sm">Pay Now</button>
+          {canPay && (
+            <button onClick={handlePay} disabled={paying} className="btn-primary text-sm">
+              {paying ? 'Processing…' : 'Pay Now'}
+            </button>
           )}
           {['REQUESTED', 'MATCHING'].includes(booking.status) && (
             <button onClick={handleCancel} className="btn-danger text-sm">Cancel</button>

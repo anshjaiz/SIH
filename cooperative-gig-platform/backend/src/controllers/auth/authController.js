@@ -4,14 +4,13 @@ const Customer = require('../../models/CustomerProfile');
 const Notification = require('../../models/Notification');
 const EmailVerification = require('../../models/EmailVerification');
 const { generateToken, sanitizeUser, generateOTP } = require('../../utils/authHelper');
-const { generateSecureOtp, hashOtp, safeEqual, maskEmail } = require('../../utils/otpUtils');
+const { generateSecureOtp, hashOtp, safeEqual, maskEmail, OTP_TTL_MS } = require('../../utils/otpUtils');
 const { sendOtpEmail } = require('../../services/emailService');
 const { restoreIfExpired } = require('../../services/worker/workerSuspensionService');
 const { suspensionStatus } = require('../../utils/workerStatus');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 
-const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const RESEND_COOLDOWN_MS = 30 * 1000; // 30 seconds
+const OTP_RESEND_COOLDOWN_MS = 30 * 1000; // 30 seconds between OTP mails
 const MAX_ATTEMPTS = 5;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
@@ -23,17 +22,19 @@ const validateEmail = (email) => {
   return normalized;
 };
 
-// Enforces the resend cooldown so the Resend API cannot be spammed.
-const enforceResendCooldown = async (email) => {
+// Enforces the OTP resend cooldown so the SMTP relay cannot be spammed.
+const enforceOtpResendCooldown = async (email) => {
   const last = await EmailVerification.findOne({ email }).sort({ createdAt: -1 }).select('createdAt');
-  if (last && Date.now() - last.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+  if (last && Date.now() - last.createdAt.getTime() < OTP_RESEND_COOLDOWN_MS) {
     throw new ApiError('Please wait a moment before requesting a new code.', 429);
   }
 };
 
 // Generate a secure OTP, store only its hash, and email the plaintext code.
+// Returns { devOtp } when the OTP_CONSOLE_FALLBACK dev mode swallowed a
+// delivery failure so the local demo can still complete registration.
 const createVerificationFor = async (user) => {
-  await enforceResendCooldown(user.email);
+  await enforceOtpResendCooldown(user.email);
   const otp = generateSecureOtp();
   await EmailVerification.deleteMany({ email: user.email });
   await EmailVerification.create({
@@ -41,7 +42,8 @@ const createVerificationFor = async (user) => {
     otpHash: hashOtp(otp, user.email),
     expiresAt: new Date(Date.now() + OTP_TTL_MS),
   });
-  await sendOtpEmail({ toEmail: user.email, otp, name: user.name });
+  const result = await sendOtpEmail({ toEmail: user.email, otp, name: user.name });
+  return { devOtp: result && result.delivered === false ? otp : null };
 };
 
 // Attaches the role-specific profile shape used by login/me responses.
@@ -103,12 +105,12 @@ const register = asyncHandler(async (req, res) => {
       throw new ApiError('Email already registered.', 400);
     }
     // Unverified account → allow reverification instead of duplicating.
-    await createVerificationFor(existingUser);
+    const re = await createVerificationFor(existingUser);
     return res.status(200).json({
       success: true,
       requiresVerification: true,
       message: 'We sent a 6-digit verification code to your email. Please verify to activate your account.',
-      data: { email: maskEmail(existingUser.email) },
+      data: { email: maskEmail(existingUser.email), devOtp: (re && re.devOtp) || null },
     });
   }
 
@@ -153,8 +155,12 @@ const register = asyncHandler(async (req, res) => {
 
   // Generate + send the OTP. If the email never goes out, roll the account
   // back so a retry is clean instead of leaving a stuck unverified user.
+  // (OTP_CONSOLE_FALLBACK dev mode swallows delivery failures and returns
+  // the code instead of rolling back.)
+  let devOtp = null;
   try {
-    await createVerificationFor(user);
+    const sent = await createVerificationFor(user);
+    devOtp = (sent && sent.devOtp) || null;
   } catch (err) {
     await User.deleteMany({ _id: user._id });
     if (role === 'worker') await Worker.deleteMany({ user: user._id });
@@ -168,7 +174,7 @@ const register = asyncHandler(async (req, res) => {
     success: true,
     requiresVerification: true,
     message: 'We sent a 6-digit verification code to your email. Please verify to activate your account.',
-    data: { email: maskEmail(user.email) },
+    data: { email: maskEmail(user.email), devOtp },
   });
 });
 
@@ -297,13 +303,13 @@ const resendOtp = asyncHandler(async (req, res) => {
   }
 
   // Cooldown + fresh code, invalidates the previous OTP.
-  await createVerificationFor(user);
+  const sent = await createVerificationFor(user);
 
   res.json({
     success: true,
     requiresVerification: true,
     message: 'A new verification code has been sent to your email.',
-    data: { email: maskEmail(user.email) },
+    data: { email: maskEmail(user.email), devOtp: (sent && sent.devOtp) || null },
   });
 });
 

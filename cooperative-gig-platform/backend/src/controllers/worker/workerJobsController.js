@@ -78,7 +78,7 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
 
     // Total earnings
     Payment.aggregate([
-      { $match: { worker: workerId, status: 'SUCCESS' } },
+      { $match: { worker: workerId, status: { $in: ['PAID', 'SUCCESS'] } } },
       { $group: { _id: null, total: { $sum: '$workerNetEarnings' } } },
     ]),
 
@@ -88,7 +88,7 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
       startOfWeek.setHours(0, 0, 0, 0);
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
       return Payment.aggregate([
-        { $match: { worker: workerId, status: 'SUCCESS', paymentDate: { $gte: startOfWeek } } },
+        { $match: { worker: workerId, status: { $in: ['PAID', 'SUCCESS'] }, paymentDate: { $gte: startOfWeek } } },
         { $group: { _id: null, total: { $sum: '$workerNetEarnings' } } },
       ]);
     })(),
@@ -459,7 +459,8 @@ const completeJob = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Job completed', data: booking });
 });
 
-// Confirm completion (customer confirms)
+// Confirm completion (customer confirms) → releases the worker's pending
+// earning into the wallet. Idempotent: a second call is a no-op.
 const confirmCompletion = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id).populate('service', 'name');
   if (!booking) throw new ApiError('Booking not found', 404);
@@ -470,12 +471,45 @@ const confirmCompletion = asyncHandler(async (req, res) => {
     throw new ApiError('Booking not in completed state', 400);
   }
 
+  const wasConfirmed = booking.customerConfirmed;
   booking.customerConfirmed = true;
+  booking.customerConfirmedAt = new Date();
   await booking.save();
 
-  // Generate payment & invoice here? Handled by payment flow
+  // Release the held earning exactly once (ledger CAS guard inside).
+  let release = { released: false };
+  if (booking.worker) {
+    const { releaseEarning } = require('../../services/wallet/walletService');
+    release = await releaseEarning({
+      bookingId: booking._id,
+      workerId: booking.worker,
+    });
+  }
 
-  res.json({ success: true, message: 'Completion confirmed. Payment processed.' });
+  // Complete the collaboration team credits (finance finalization).
+  const { completeTeam } = require('../../services/collaborator/teamFormationService');
+  await completeTeam(booking._id).catch(() => {});
+
+  const io = getIO();
+  if (io) io.to(`worker_${booking.worker}`).emit('earning_update', { bookingId: booking._id, released: release.released, amount: release.amount });
+
+  if (!wasConfirmed) {
+    await Notification.create({
+      user: booking.worker ? (await Worker.findById(booking.worker).select('user'))?.user : undefined,
+      type: 'EARNING_RELEASED',
+      title: 'Earning released',
+      message: release.released
+        ? `₹${release.amount} for ${booking.serviceSnapshot?.name || 'your job'} was added to your wallet.`
+        : 'Your job was confirmed.',
+      data: { bookingId: booking._id },
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Completion confirmed. Earning released to worker wallet.',
+    data: { customerConfirmed: true, earningReleased: release.released, amountReleased: release.amount || 0 },
+  });
 });
 
 // Worker earnings summary
@@ -485,7 +519,7 @@ const getEarnings = asyncHandler(async (req, res) => {
 
   const payments = await Payment.find({
     worker: worker._id,
-    status: 'SUCCESS',
+    status: { $in: ['PAID', 'SUCCESS'] },
   }).populate('booking', 'serviceSnapshot');
 
   const totalGross = payments.reduce((s, p) => s + (p.workerGross || p.amount), 0);

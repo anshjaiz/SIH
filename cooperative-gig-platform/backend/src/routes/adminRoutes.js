@@ -39,6 +39,11 @@ const {
 } = require('../controllers/admin/analyticsController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const {
+  getPaymentOverview,
+  getAllPayouts,
+  updatePayoutStatus,
+} = require('../controllers/payments/adminPaymentController');
+const {
   listReliabilityWorkers,
   getWorkerReliabilityDetail,
   adjustWorkerReliability,
@@ -96,6 +101,11 @@ router.get('/bookings', getAllBookings);
 
 // Payments
 router.get('/payments', getAllPayments);
+router.get('/payments/overview', getPaymentOverview);
+
+// Payouts (worker withdrawal management)
+router.get('/payouts', getAllPayouts);
+router.put('/payouts/:id/status', updatePayoutStatus);
 
 // Complaints & Disputes
 router.get('/complaints', acGetComplaints);

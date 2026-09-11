@@ -188,9 +188,9 @@ async function getWorkerEarnings(workerId) {
   const sevenDaysAgo = new Date(now - 7 * DAY_MS);
 
   const [allPayments, recent30, recent7, allJobs] = await Promise.all([
-    Payment.find({ worker: workerId, status: 'SUCCESS' }).sort({ paymentDate: -1 }).lean(),
-    Payment.find({ worker: workerId, status: 'SUCCESS', paymentDate: { $gte: thirtyDaysAgo } }).lean(),
-    Payment.find({ worker: workerId, status: 'SUCCESS', paymentDate: { $gte: sevenDaysAgo } }).lean(),
+    Payment.find({ worker: workerId, status: { $in: ['PAID', 'SUCCESS'] } }).sort({ paymentDate: -1 }).lean(),
+    Payment.find({ worker: workerId, status: { $in: ['PAID', 'SUCCESS'] }, paymentDate: { $gte: thirtyDaysAgo } }).lean(),
+    Payment.find({ worker: workerId, status: { $in: ['PAID', 'SUCCESS'] }, paymentDate: { $gte: sevenDaysAgo } }).lean(),
     Booking.find({ worker: workerId, status: 'COMPLETED' }).lean(),
   ]);
 

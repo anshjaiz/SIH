@@ -76,10 +76,10 @@ const invoiceSchema = new mongoose.Schema(
 );
 
 invoiceSchema.index({ customer: 1 });
-module.exports = mongoose.model('Invoice', invoiceSchema);
 
-// Auto-generate invoice number
-invoiceSchema.pre('save', async function (next) {
+// Hook MUST be registered before the model is compiled, or the field stays
+// null on save (which breaks the unique index).
+invoiceSchema.pre('save', function (next) {
   if (!this.invoiceNumber) {
     const date = new Date();
     const year = date.getFullYear();

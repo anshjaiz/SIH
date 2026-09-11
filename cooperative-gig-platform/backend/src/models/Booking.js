@@ -161,6 +161,15 @@ const bookingSchema = new mongoose.Schema(
         respondedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       },
     ],
+    // Payment gate — kept SEPARATE from the job/booking lifecycle status.
+    // UNPAID → PENDING (order created) → PAID (verified) → REFUNDED.
+    paymentStatus: {
+      type: String,
+      enum: ['UNPAID', 'PENDING', 'PAID', 'FAILED', 'REFUNDED'],
+      default: 'UNPAID',
+      index: true,
+    },
+    paidAt: Date,
     // Matching info
     matchedScore: {
       type: Number,

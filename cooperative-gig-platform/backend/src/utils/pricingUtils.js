@@ -41,20 +41,67 @@ const computePriceBreakdown = (
 };
 
 /**
- * Compute worker earnings from a payment
- * @param {Number} amount - gross amount paid (labour portion typically)
+ * Compute worker earnings from a payment.
+ *
+ * PRICING MODEL (Option B, matches the existing all-inclusive logic):
+ *   Customer pays the service price (₹500). The platform fee (5%) and the
+ *   cooperative contribution (2%) are carved out internally — they are NEVER
+ *   added on top of the customer's price. The worker therefore receives:
+ *       gross − platformFee − cooperativeContribution   (e.g. ₹475 on ₹500
+ *     when the cooperative contribution is 0%, ₹465 at the default 2%).
+ *
+ * @param {Number} gross - worker's gross = labour (service charge)
+ * @param {Number} platformFee
  * @param {Number} cooperativeContributionPercent
  */
-const computeWorkerEarnings = (amount, cooperativeContributionPercent = 2) => {
-  const gross = Number(amount) || 0;
-  const cooperativeDeduction = (gross * cooperativeContributionPercent) / 100;
-  const netEarnings = gross - cooperativeDeduction;
+const computeWorkerEarnings = (
+  gross,
+  platformFee,
+  cooperativeContributionPercent = 2
+) => {
+  const labour = Number(gross) || 0;
+  const fee = Number(platformFee) || 0;
+  const cooperativeDeduction = (labour * cooperativeContributionPercent) / 100;
+  const netEarnings = labour - fee - cooperativeDeduction;
 
   return {
-    workerGross: Math.round(gross * 100) / 100,
-    cooperativeDeduction: Math.round(cooperativeDeduction * 100) / 100,
-    workerNetEarnings: Math.round(netEarnings * 100) / 100,
+    workerGross: round(labour),
+    platformFee: round(fee),
+    cooperativeDeduction: round(cooperativeDeduction),
+    workerNetEarnings: round(netEarnings),
   };
 };
 
-module.exports = { computePriceBreakdown, computeWorkerEarnings };
+/**
+ * Full split for the payment receipt — all figures backend-computed.
+ * @param {Number} labour - service charge
+ * @param {Number} materials - approved material cost (usually 0 at payment)
+ * @param {Object} cooperativeConfig { cooperativeContributionPercent, platformFeePercent }
+ */
+const computeEarningsSplit = (
+  labour,
+  materials,
+  cooperativeConfig = { cooperativeContributionPercent: 2, platformFeePercent: 5 }
+) => {
+  const breakdown = computePriceBreakdown(labour, materials, cooperativeConfig);
+  const worker = computeWorkerEarnings(
+    labour,
+    breakdown.platformFee,
+    cooperativeConfig.cooperativeContributionPercent
+  );
+
+  return {
+    customerTotal: breakdown.total,
+    labour: breakdown.labour,
+    materials: breakdown.materials,
+    platformFee: breakdown.platformFee,
+    cooperativeContribution: breakdown.cooperativeContribution,
+    workerGross: worker.workerGross,
+    cooperativeDeduction: worker.cooperativeDeduction,
+    workerNetEarnings: worker.workerNetEarnings,
+  };
+};
+
+const round = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+
+module.exports = { computePriceBreakdown, computeWorkerEarnings, computeEarningsSplit };

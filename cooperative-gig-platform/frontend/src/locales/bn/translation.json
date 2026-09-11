@@ -10,8 +10,8 @@
     "switchTo": "ভাষা পরিবর্তন করুন"
   },
   "app": {
-    "name": "Aman Seva Cooperative",
-    "shortName": "AS",
+    "name": "Shramik Setu",
+    "shortName": "SS",
     "platformTagline": "সহযোগী গিগ সেবা প্ল্যাটফর্ম",
     "subtitle": "সেবাপ্রদানকারী ও গ্রাহক, একসাথে"
   },
@@ -116,7 +116,7 @@
     "signingIn": "প্রবেশ করা হচ্ছে…",
     "createAccount": "অ্যাকাউন্ট তৈরি করুন",
     "creatingAccount": "অ্যাকাউন্ট তৈরি হচ্ছে…",
-    "joinTagline": "Aman Seva Cooperative-এ যোগ দিন — কাজ শুরু করুন বা যাচাইকৃত পেশাদারদের নিয়োগ দিন",
+    "joinTagline": "Shramik Setu-এ যোগ দিন — কাজ শুরু করুন বা যাচাইকৃত পেশাদারদের নিয়োগ দিন",
     "welcomeBack": "স্বাগতম!",
     "iAmA": "আমি একজন",
     "fullName": "পুরো নাম",

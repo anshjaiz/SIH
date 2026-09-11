@@ -18,16 +18,16 @@ export default function DashboardLayout({ role }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="dashboard-shell flex h-screen overflow-hidden">
       <Sidebar role={role} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
 
       {/* Main content */}
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
         {/* Top bar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#e3e5dc] bg-[#fffdf8]/90 px-6 backdrop-blur-md">
           <div>
-            <h1 className="font-semibold text-gray-800">{roleLabel[role] || t('nav.dashboard')}</h1>
-            <p className="text-xs text-gray-500">{t('app.name')}</p>
+            <h1 className="font-bold tracking-tight text-[#17211b]">{roleLabel[role] || t('nav.dashboard')}</h1>
+            <p className="text-xs text-[#7a857c]">{t('app.name')}</p>
           </div>
           <div className="flex items-center gap-3">
             <LanguageSelector compact />
@@ -36,14 +36,14 @@ export default function DashboardLayout({ role }) {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
             <div className="text-sm text-gray-700 hidden sm:block">
-              <span className="font-medium">{user?.name}</span>
+              <span className="font-semibold text-[#35443a]">{user?.name}</span>
               <span className="text-gray-400 ml-2 text-xs">({user?.role})</span>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+        <main className="dashboard-main flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
       </div>

@@ -10,8 +10,8 @@
     "switchTo": "Switch language"
   },
   "app": {
-    "name": "Aman Seva Cooperative",
-    "shortName": "AS",
+    "name": "Shramik Setu",
+    "shortName": "SS",
     "platformTagline": "Cooperative Gig Services Platform",
     "subtitle": "Service workers & customers, together"
   },
@@ -116,7 +116,7 @@
     "signingIn": "Signing in…",
     "createAccount": "Create Account",
     "creatingAccount": "Creating account…",
-    "joinTagline": "Join Aman Seva Cooperative — start working or hire verified professionals",
+    "joinTagline": "Join Shramik Setu — start working or hire verified professionals",
     "welcomeBack": "Welcome back!",
     "iAmA": "I am a",
     "fullName": "Full Name",

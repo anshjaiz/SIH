@@ -69,7 +69,7 @@ export default function Login() {
           <div>
             <div className="flex items-center gap-3">
               <span className="auth-mark">{t('app.shortName')}</span>
-              <span className="text-sm font-semibold tracking-wide text-emerald-50">AMAN SEVA</span>
+              <span className="text-sm font-semibold tracking-wide text-emerald-50">SHRAMIK SETU</span>
             </div>
             <div className="mt-20 max-w-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">Work with dignity</p>
@@ -86,7 +86,7 @@ export default function Login() {
 
         <div className="p-6 sm:p-10">
           <div className="mb-8 lg:hidden">
-            <div className="flex items-center gap-3"><span className="auth-mark">{t('app.shortName')}</span><span className="text-sm font-bold tracking-wide text-[#245f4e]">AMAN SEVA</span></div>
+            <div className="flex items-center gap-3"><span className="auth-mark">{t('app.shortName')}</span><span className="text-sm font-bold tracking-wide text-[#245f4e]">SHRAMIK SETU</span></div>
           </div>
           <div className="mb-8">
             <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#c18b25]">Welcome back</p>

@@ -10,8 +10,8 @@
     "switchTo": "Bhasha badlein"
   },
   "app": {
-    "name": "Aman Seva Cooperative",
-    "shortName": "AS",
+    "name": "Shramik Setu",
+    "shortName": "SS",
     "platformTagline": "Cooperative Gig Services Platform",
     "subtitle": "Service workers aur customers, saath mein"
   },
@@ -116,7 +116,7 @@
     "signingIn": "Login ho raha hai…",
     "createAccount": "Naya Account banayein",
     "creatingAccount": "Account ban raha hai…",
-    "joinTagline": "Aman Seva Cooperative se juden — kaam shuru karein ya verified professionals ko hire karein",
+    "joinTagline": "Shramik Setu se juden — kaam shuru karein ya verified professionals ko hire karein",
     "welcomeBack": "Phir se swagat hai!",
     "iAmA": "Main hoon ek",
     "fullName": "Poora Naam",
